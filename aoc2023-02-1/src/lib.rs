@@ -53,8 +53,8 @@ impl TryFrom<&str> for GameRound {
         let mut green = 0;
         let mut blue = 0;
 
-        static BALL_COUNT: OnceLock<Regex> = OnceLock::new();
-        let matches = BALL_COUNT
+        static CUBE_COUNT: OnceLock<Regex> = OnceLock::new();
+        let matches = CUBE_COUNT
             .get_or_init(|| Regex::new(r"\b(\d+)\s+(red|green|blue)\b").unwrap())
             .captures_iter(value)
             .map(|c| c.extract().1);
@@ -102,7 +102,7 @@ impl TryFrom<&str> for Game {
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         static GAME_ID: OnceLock<Regex> = OnceLock::new();
         let id = GAME_ID
-            .get_or_init(|| Regex::new(r"^Game (?<id>\d):").unwrap())
+            .get_or_init(|| Regex::new(r"^Game (?<id>\d+):").unwrap())
             .captures(value)
             .ok_or(GameSpecError::GameIdParse)?
             .name("id")
