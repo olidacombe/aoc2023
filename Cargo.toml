@@ -1,6 +1,12 @@
 [workspace]
 
-members = ["aoc2023-01-1", "aoc2023-01-2", "aoc2023-02-1", "aoc2023-02-2"]
+members = [
+    "aoc2023-01-1",
+    "aoc2023-01-2",
+    "aoc2023-02-1",
+    "aoc2023-02-2",
+    "aoc2023-03-1",
+]
 
 [workspace.dependencies]
 color-eyre = "0.6.2"
