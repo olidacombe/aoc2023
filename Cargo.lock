@@ -52,6 +52,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc2023-02-2"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "indoc",
+ "regex",
+ "thiserror",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
