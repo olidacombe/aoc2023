@@ -75,7 +75,7 @@ fn calibration(v: &str) -> Result<u32> {
     Ok(10 * first_digit(v)? + last_digit(v)?)
 }
 
-pub fn sum_calibration<'a>(it: impl Iterator<Item = String>) -> Result<u32> {
+pub fn sum_calibration(it: impl Iterator<Item = String>) -> Result<u32> {
     it.filter_map(|line| calibration(&line).ok())
         .reduce(|acc, v| acc + v)
         .ok_or(eyre!("Some calibration summing error 🤷"))

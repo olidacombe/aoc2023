@@ -1,10 +1,9 @@
 [workspace]
 
-members = [
-    "aoc2023-01-1",
-    "aoc2023-01-2"
-]
+members = ["aoc2023-01-1", "aoc2023-01-2", "aoc2023-02-1"]
 
 [workspace.dependencies]
 color-eyre = "0.6.2"
 indoc = "2.0.4"
+regex = "1.10.2"
+thiserror = "1.0.50"
