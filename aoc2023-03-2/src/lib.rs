@@ -3,6 +3,7 @@ use bitvec::vec::BitVec;
 use regex::{Match, Matches, Regex};
 use std::sync::OnceLock;
 
+#[derive(Debug)]
 struct Gear {
     matrix: [BitVec; 3],
     current: usize,
@@ -65,7 +66,7 @@ impl Gear {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct GearScanner {
     gear_ratio_sum: u32,
     gears: Vec<Gear>,
@@ -124,6 +125,7 @@ pub fn sum_gear_ratios(it: impl Iterator<Item = String>) -> u32 {
         scanner.read_numbers(&line);
         scanner.inc();
     }
+    scanner.inc();
     scanner.gear_ratio_sum
 }
 
