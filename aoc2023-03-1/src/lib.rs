@@ -3,15 +3,15 @@ use std::sync::OnceLock;
 use bitvec::vec::BitVec;
 use regex::{Match, Matches, Regex};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct HitMatrix {
     matrix: [BitVec; 3],
     current: usize,
 }
 
 impl HitMatrix {
-    fn next_mut(&mut self) -> &mut BitVec {
-        &mut self.matrix[(self.current + 1) % 3]
+    fn prev_mut(&mut self) -> &mut BitVec {
+        &mut self.matrix[(self.current + 2) % 3]
     }
 
     fn size_up(&mut self, len: usize) {
@@ -41,8 +41,7 @@ impl HitMatrix {
             .get_or_init(|| Regex::new(r"[^.0-9]").unwrap())
             .find_iter(line)
             .map(|m| m.start());
-        let next = self.next_mut();
-        next.fill(false);
+        self.prev_mut().fill(false);
         for i in symbol_indices {
             self.set_hit(i);
         }
@@ -71,19 +70,16 @@ pub fn sum_part_numbers(it: impl Iterator<Item = String>) -> u32 {
     let mut matrix = HitMatrix::default();
     let mut total = 0;
     let mut it = it.peekable();
+    matrix.inc();
     if let Some(ref line) = it.peek() {
         matrix.read(&line);
     }
-    matrix.inc();
     while let Some(line) = it.next() {
         if let Some(line) = it.peek() {
             matrix.read(&line);
         }
         for cap in number_captures(&line) {
             if let Some(num) = matrix.hit_test(&cap) {
-                // it seems I'm missing any numbers which should
-                // hit when they're "below" a symbol... 🤔
-                dbg!(num);
                 total += num;
             }
         }
@@ -112,25 +108,30 @@ mod test {
     #[test]
     fn hit_matrix_cycle() {
         let mut matrix = HitMatrix::default();
+        matrix.inc();
         matrix.read("467..114..");
+        assert_eq!(matrix.current, 1);
         assert_eq!(matrix.matrix[0], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(matrix.matrix[1], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(matrix.matrix[1], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // <-- current
         assert_eq!(matrix.matrix[2], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         matrix.inc();
         matrix.read("...*......");
+        assert_eq!(matrix.current, 2);
         assert_eq!(matrix.matrix[0], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]);
         assert_eq!(matrix.matrix[1], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]);
-        assert_eq!(matrix.matrix[2], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(matrix.matrix[2], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]); // <-- current
         matrix.inc();
         matrix.read("..35..633.");
-        assert_eq!(matrix.matrix[0], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(matrix.current, 0);
+        assert_eq!(matrix.matrix[0], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]); // <-- current
         assert_eq!(matrix.matrix[1], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]);
-        assert_eq!(matrix.matrix[2], bitvec![0, 0, 1, 1, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(matrix.matrix[2], bitvec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         matrix.inc();
         matrix.read("......#...");
+        assert_eq!(matrix.current, 1);
         assert_eq!(matrix.matrix[0], bitvec![0, 0, 0, 0, 0, 1, 1, 1, 0, 0]);
-        assert_eq!(matrix.matrix[1], bitvec![0, 0, 0, 0, 0, 1, 1, 1, 0, 0]);
-        assert_eq!(matrix.matrix[2], bitvec![0, 0, 1, 1, 1, 1, 1, 1, 0, 0]);
+        assert_eq!(matrix.matrix[1], bitvec![0, 0, 1, 1, 1, 1, 1, 1, 0, 0]); // <-- current
+        assert_eq!(matrix.matrix[2], bitvec![0, 0, 0, 0, 0, 1, 1, 1, 0, 0]);
     }
 
     #[test]
