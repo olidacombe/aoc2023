@@ -6,9 +6,11 @@ members = [
     "aoc2023-02-1",
     "aoc2023-02-2",
     "aoc2023-03-1",
+    "aoc2023-03-2",
 ]
 
 [workspace.dependencies]
+bitvec = "1.0.1"
 color-eyre = "0.6.2"
 indoc = "2.0.4"
 regex = "1.10.2"

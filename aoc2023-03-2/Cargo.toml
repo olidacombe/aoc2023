@@ -1,11 +1,12 @@
 [package]
-name = "aoc2023-03-1"
+name = "aoc2023-03-2"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+array-macro = "2.1.8"
 bitvec = { workspace = true }
 color-eyre = { workspace = true }
 regex = { workspace = true }
