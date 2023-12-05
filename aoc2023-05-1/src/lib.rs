@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::{iter::Peekable, sync::OnceLock};
 
 use regex::Regex;
 
@@ -36,6 +36,7 @@ impl From<&str> for Mapping {
             .get_or_init(|| Regex::new(r"^(?<dest>\d+) (?<source>\d+) (?<length>\d+)$").unwrap())
             .captures(value)
             .unwrap();
+        dbg!(&captures);
         let start = captures.name("source").unwrap().as_str().parse().unwrap();
         let end = start
             + captures
@@ -80,6 +81,18 @@ impl Map {
     }
 }
 
+#[derive(Debug, Default)]
+struct Maps(Vec<Map>);
+
+impl Maps {
+    pub fn digest(&self, mut seed: i32) -> i32 {
+        for map in self.0.iter() {
+            seed = map.get(seed);
+        }
+        seed
+    }
+}
+
 fn get_seeds(line: &str) -> Vec<i32> {
     static SEEDS: OnceLock<Regex> = OnceLock::new();
     SEEDS
@@ -90,28 +103,33 @@ fn get_seeds(line: &str) -> Vec<i32> {
 }
 
 /// get a single Map from input stream
-fn get_map(it: &mut impl Iterator<Item = String>) -> Map {
+fn get_map<I>(it: &mut Peekable<I>) -> Map
+where
+    I: Iterator<Item = String>,
+{
     static PREAMBLE: OnceLock<Regex> = OnceLock::new();
     let preamble = PREAMBLE.get_or_init(|| Regex::new(r"^[^\d]*$").unwrap());
 
     // throw away preamble
-    while let Some(line) = it.next() {
+    while let Some(line) = it.peek() {
         if !preamble.is_match(line.as_str()) {
             break;
         }
+        it.next();
     }
 
     let mut map = Map::default();
-    while let Some(line) = it.next() {
+    while let Some(line) = it.peek() {
         if preamble.is_match(line.as_str()) {
             break;
         }
         map.push(Mapping::from(line.as_str()));
+        it.next();
     }
     map
 }
 
-fn get_maps(mut it: impl Iterator<Item = String>) -> Vec<Map> {
+fn get_maps(it: impl Iterator<Item = String>) -> Maps {
     let mut maps = Vec::new();
     let mut it = it.peekable();
 
@@ -119,16 +137,17 @@ fn get_maps(mut it: impl Iterator<Item = String>) -> Vec<Map> {
         maps.push(get_map(&mut it));
     }
 
-    maps
+    Maps(maps)
 }
 
 pub fn nearest_seed_location(mut it: impl Iterator<Item = String>) -> i32 {
     let seeds = get_seeds(it.next().unwrap().as_str());
     let maps = get_maps(it);
-
-    dbg!(maps);
-
-    0
+    seeds
+        .iter()
+        .map(|seed| maps.digest(seed.clone()))
+        .min()
+        .unwrap()
 }
 
 #[cfg(test)]
