@@ -4,12 +4,12 @@ use regex::Regex;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct SourceRange {
-    start: i32,
-    end: i32,
+    start: i64,
+    end: i64,
 }
 
 impl SourceRange {
-    pub fn has(&self, source: i32) -> bool {
+    pub fn has(&self, source: i64) -> bool {
         self.start <= source && source <= self.end
     }
 }
@@ -17,11 +17,11 @@ impl SourceRange {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Mapping {
     range: SourceRange,
-    offset: i32,
+    offset: i64,
 }
 
 impl Mapping {
-    pub fn get(&self, source: i32) -> Option<i32> {
+    pub fn get(&self, source: i64) -> Option<i64> {
         if self.range.has(source) {
             return Some(source + self.offset);
         }
@@ -36,21 +36,20 @@ impl From<&str> for Mapping {
             .get_or_init(|| Regex::new(r"^(?<dest>\d+) (?<source>\d+) (?<length>\d+)$").unwrap())
             .captures(value)
             .unwrap();
-        dbg!(&captures);
         let start = captures.name("source").unwrap().as_str().parse().unwrap();
         let end = start
             + captures
                 .name("length")
                 .unwrap()
                 .as_str()
-                .parse::<i32>()
+                .parse::<i64>()
                 .unwrap()
             - 1;
         let offset = captures
             .name("dest")
             .unwrap()
             .as_str()
-            .parse::<i32>()
+            .parse::<i64>()
             .unwrap()
             - start;
 
@@ -71,7 +70,7 @@ impl Map {
         self.0.sort();
     }
 
-    pub fn get(&self, source: i32) -> i32 {
+    pub fn get(&self, source: i64) -> i64 {
         for mapping in self.0.iter() {
             if let Some(destination) = mapping.get(source) {
                 return destination;
@@ -85,7 +84,7 @@ impl Map {
 struct Maps(Vec<Map>);
 
 impl Maps {
-    pub fn digest(&self, mut seed: i32) -> i32 {
+    pub fn digest(&self, mut seed: i64) -> i64 {
         for map in self.0.iter() {
             seed = map.get(seed);
         }
@@ -93,7 +92,7 @@ impl Maps {
     }
 }
 
-fn get_seeds(line: &str) -> Vec<i32> {
+fn get_seeds(line: &str) -> Vec<i64> {
     static SEEDS: OnceLock<Regex> = OnceLock::new();
     SEEDS
         .get_or_init(|| Regex::new(r"\d+").unwrap())
@@ -140,7 +139,7 @@ fn get_maps(it: impl Iterator<Item = String>) -> Maps {
     Maps(maps)
 }
 
-pub fn nearest_seed_location(mut it: impl Iterator<Item = String>) -> i32 {
+pub fn nearest_seed_location(mut it: impl Iterator<Item = String>) -> i64 {
     let seeds = get_seeds(it.next().unwrap().as_str());
     let maps = get_maps(it);
     seeds
