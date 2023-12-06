@@ -10,6 +10,7 @@ members = [
     "aoc2023-04-1",
     "aoc2023-04-2",
     "aoc2023-05-1",
+    "aoc2023-05-2",
 ]
 
 [workspace.dependencies]
