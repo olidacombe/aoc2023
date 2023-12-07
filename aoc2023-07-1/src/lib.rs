@@ -84,19 +84,19 @@ impl From<&[Card; 5]> for Type {
             .map(|(card, count)| (count, card))
             .collect();
         ordered_counts.sort();
-        let (top_count, most_frequent_card) = ordered_counts.pop().unwrap();
+        let (top_count, _) = ordered_counts.pop().unwrap();
         match top_count {
             5 => Self::OAK5,
             4 => Self::OAK4,
             3 => {
-                let (second_count, smfc) = ordered_counts.pop().unwrap();
+                let (second_count, _) = ordered_counts.pop().unwrap();
                 match second_count {
                     2 => Self::FH,
                     _ => Self::OAK3,
                 }
             }
             2 => {
-                let (n, card) = ordered_counts.pop().unwrap();
+                let (n, _) = ordered_counts.pop().unwrap();
                 match n {
                     2 => Self::P2,
                     _ => Self::P1,
@@ -147,7 +147,7 @@ impl From<&str> for Prospect {
     }
 }
 
-pub fn total_winnings(mut it: impl Iterator<Item = String>) -> u64 {
+pub fn total_winnings(it: impl Iterator<Item = String>) -> u64 {
     let mut prospects: Vec<Prospect> = it.map(|line| Prospect::from(line.as_str())).collect();
     prospects.sort();
     prospects
