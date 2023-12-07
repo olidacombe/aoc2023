@@ -89,7 +89,7 @@ impl From<&[Card; 5]> for Type {
             .map(|(card, count)| (count, card))
             .collect();
         ordered_counts.sort();
-        let (mut top_count, _) = ordered_counts.pop().unwrap();
+        let (mut top_count, _) = ordered_counts.pop().unwrap_or((0, Card::Joker));
         top_count += joker_count;
         match top_count {
             5 => Self::OAK5,
