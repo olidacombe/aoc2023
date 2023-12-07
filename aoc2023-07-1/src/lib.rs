@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::OnceLock};
 
+use regex::Regex;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -48,7 +49,7 @@ impl TryFrom<char> for Card {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Type {
     OAK5(Card),
     OAK4(Card),
@@ -106,10 +107,10 @@ impl From<&[Card; 5]> for Type {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Hand {
-    cards: [Card; 5],
     t: Type,
+    cards: [Card; 5],
 }
 
 impl From<&str> for Hand {
@@ -126,8 +127,43 @@ impl From<&str> for Hand {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct Prospect {
+    hand: Hand,
+    bid: u64,
+}
+
+impl From<&str> for Prospect {
+    fn from(value: &str) -> Self {
+        static HAND_BID: OnceLock<Regex> = OnceLock::new();
+        let (_, [hand, bid]) = HAND_BID
+            .get_or_init(|| Regex::new(r"(\w+)\s+(\d+)").unwrap())
+            .captures(value)
+            .unwrap()
+            .extract();
+        let hand = Hand::from(hand);
+        let bid = bid.parse().unwrap();
+        Self { hand, bid }
+    }
+}
+
 pub fn total_winnings(mut it: impl Iterator<Item = String>) -> u64 {
-    u64::default()
+    let mut prospects: Vec<Prospect> = it.map(|line| Prospect::from(line.as_str())).collect();
+    prospects.sort();
+    dbg!(&prospects);
+    prospects
+        .iter()
+        .enumerate()
+        .map(|(idx, prospect)| (idx as u64 + 1) * prospect.bid)
+        .sum()
+    // let prospects: Vec<u64> = prospects
+    //     .iter()
+    //     .rev()
+    //     .enumerate()
+    //     .map(|(idx, prospect)| (idx as u64 + 1) * prospect.bid)
+    //     .collect();
+    // dbg!(&prospects);
+    // 0
 }
 
 #[cfg(test)]
