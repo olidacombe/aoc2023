@@ -1,0 +1,11 @@
+[package]
+name = "aoc2023-07-2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
