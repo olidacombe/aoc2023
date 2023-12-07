@@ -1,18 +1,6 @@
 [workspace]
 
-members = [
-    "aoc2023-01-1",
-    "aoc2023-01-2",
-    "aoc2023-02-1",
-    "aoc2023-02-2",
-    "aoc2023-03-1",
-    "aoc2023-03-2",
-    "aoc2023-04-1",
-    "aoc2023-04-2",
-    "aoc2023-05-1",
-    "aoc2023-05-2",
-    "aoc2023-06-1",
-]
+members = ["aoc2023-*"]
 
 [workspace.dependencies]
 bitvec = "1.0.1"
