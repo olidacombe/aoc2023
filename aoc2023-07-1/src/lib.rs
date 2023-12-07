@@ -51,13 +51,13 @@ impl TryFrom<char> for Card {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Type {
-    OAK5(Card),
-    OAK4(Card),
-    FH(Card, Card),
-    OAK3(Card),
-    P2(Card, Card),
-    P1(Card),
-    HC(Card),
+    OAK5,
+    OAK4,
+    FH,
+    OAK3,
+    P2,
+    P1,
+    HC,
 }
 
 impl From<&[Card; 5]> for Type {
@@ -86,23 +86,23 @@ impl From<&[Card; 5]> for Type {
         ordered_counts.sort();
         let (top_count, most_frequent_card) = ordered_counts.pop().unwrap();
         match top_count {
-            5 => Self::OAK5(most_frequent_card),
-            4 => Self::OAK4(most_frequent_card),
+            5 => Self::OAK5,
+            4 => Self::OAK4,
             3 => {
                 let (second_count, smfc) = ordered_counts.pop().unwrap();
                 match second_count {
-                    2 => Self::FH(most_frequent_card, smfc),
-                    _ => Self::OAK3(most_frequent_card),
+                    2 => Self::FH,
+                    _ => Self::OAK3,
                 }
             }
             2 => {
                 let (n, card) = ordered_counts.pop().unwrap();
                 match n {
-                    2 => Self::P2(most_frequent_card, card),
-                    _ => Self::P1(most_frequent_card),
+                    2 => Self::P2,
+                    _ => Self::P1,
                 }
             }
-            _ => Self::HC(high_card.unwrap()),
+            _ => Self::HC,
         }
     }
 }
@@ -150,20 +150,12 @@ impl From<&str> for Prospect {
 pub fn total_winnings(mut it: impl Iterator<Item = String>) -> u64 {
     let mut prospects: Vec<Prospect> = it.map(|line| Prospect::from(line.as_str())).collect();
     prospects.sort();
-    dbg!(&prospects);
     prospects
         .iter()
+        .rev()
         .enumerate()
         .map(|(idx, prospect)| (idx as u64 + 1) * prospect.bid)
         .sum()
-    // let prospects: Vec<u64> = prospects
-    //     .iter()
-    //     .rev()
-    //     .enumerate()
-    //     .map(|(idx, prospect)| (idx as u64 + 1) * prospect.bid)
-    //     .collect();
-    // dbg!(&prospects);
-    // 0
 }
 
 #[cfg(test)]
