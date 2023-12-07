@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use thiserror::Error;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 enum Card {
     Ace,
     King,
@@ -52,14 +54,55 @@ enum Type {
     OAK4(Card),
     FH(Card, Card),
     OAK3(Card),
-    P2(Card),
+    P2(Card, Card),
     P1(Card),
     HC(Card),
 }
 
 impl From<&[Card; 5]> for Type {
-    fn from(value: &[Card; 5]) -> Self {
-        todo!()
+    fn from(cards: &[Card; 5]) -> Self {
+        let mut counts: HashMap<Card, usize> = HashMap::new();
+        let mut high_card: Option<Card> = None;
+        for card in cards {
+            match high_card {
+                None => high_card = Some(card.clone()),
+                Some(ref leader) => {
+                    if card > leader {
+                        high_card = Some(card.clone());
+                    }
+                }
+            }
+            if let Some(current) = counts.get_mut(&card) {
+                *current += 1;
+            } else {
+                counts.insert(card.clone(), 1);
+            }
+        }
+        let mut ordered_counts: Vec<(usize, Card)> = counts
+            .into_iter()
+            .map(|(card, count)| (count, card))
+            .collect();
+        ordered_counts.sort();
+        let (top_count, most_frequent_card) = ordered_counts.pop().unwrap();
+        match top_count {
+            5 => Self::OAK5(most_frequent_card),
+            4 => Self::OAK4(most_frequent_card),
+            3 => {
+                let (second_count, smfc) = ordered_counts.pop().unwrap();
+                match second_count {
+                    2 => Self::FH(most_frequent_card, smfc),
+                    _ => Self::OAK3(most_frequent_card),
+                }
+            }
+            2 => {
+                let (n, card) = ordered_counts.pop().unwrap();
+                match n {
+                    2 => Self::P2(most_frequent_card, card),
+                    _ => Self::P1(most_frequent_card),
+                }
+            }
+            _ => Self::HC(high_card.unwrap()),
+        }
     }
 }
 
