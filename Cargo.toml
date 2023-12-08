@@ -5,6 +5,9 @@ members = ["aoc2023-*"]
 [workspace.dependencies]
 bitvec = "1.0.1"
 color-eyre = "0.6.2"
+elsa = "1.9.0"
 indoc = "2.0.4"
+nom = "7.1.3"
+petgraph = "0.6.4"
 regex = "1.10.2"
 thiserror = "1.0.50"

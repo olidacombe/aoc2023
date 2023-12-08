@@ -1,0 +1,12 @@
+[package]
+name = "aoc2023-08-1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+elsa = { workspace = true, features = ["indexmap"] }
+nom = { workspace = true }
+petgraph = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
