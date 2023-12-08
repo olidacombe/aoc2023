@@ -1,3 +1,6 @@
+#![feature(lazy_cell)]
+use std::{cell::LazyCell, sync::{LazyLock, Mutex}};
+
 use elsa::FrozenIndexSet;
 use nom::{
     branch::alt,
@@ -58,14 +61,13 @@ impl<'a> NodeDef<'a> {
     }
 }
 
-struct Graph<'a> {
-    ids: FrozenIndexSet<String>,
-    graph: UnGraphMap<&'a str, Direction>,
-}
+static IDS : Mutex<LazyLock<FrozenIndexSet<String>>> = Mutex::new(LazyLock::new(||
+FrozenIndexSet::new()
+));
 
-fn read_graph<'a>(it: impl Iterator<Item = String>) -> Graph<'a> {
-    let ids = FrozenIndexSet::new();
+fn read_graph<'a>(it: impl Iterator<Item = String>) -> UnGraphMap<&'static str, Direction> {
     let mut graph = UnGraphMap::new();
+    let ids = IDS.lock().unwrap();
     for line in it {
         let NodeDef { id, left, right } = NodeDef::from(line.as_str());
         ids.insert(id.to_string());
@@ -77,7 +79,7 @@ fn read_graph<'a>(it: impl Iterator<Item = String>) -> Graph<'a> {
         graph.add_edge(id, left, Direction::Left);
         graph.add_edge(id, right, Direction::Right);
     }
-    Graph { ids, graph }
+    graph
 }
 
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
