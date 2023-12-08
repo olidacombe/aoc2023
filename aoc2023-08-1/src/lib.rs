@@ -1,7 +1,5 @@
-#![feature(lazy_cell)]
-use std::sync::{LazyLock, Mutex};
+use std::collections::HashMap;
 
-use elsa::FrozenIndexSet;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -11,7 +9,6 @@ use nom::{
     sequence::{delimited, separated_pair},
     IResult,
 };
-use petgraph::prelude::{DiGraphMap};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Direction {
@@ -31,7 +28,7 @@ impl Instructions {
     pub fn parse(input: &str) -> Self {
         Self(many0(Direction::parse)(input).unwrap().1)
     }
-    pub fn iter(&self) -> impl Iterator<Item=&Direction> {
+    pub fn iter(&self) -> impl Iterator<Item = &Direction> {
         self.0.iter().cycle()
     }
 }
@@ -64,45 +61,36 @@ impl NodeDef {
     }
 }
 
-static IDS : Mutex<LazyLock<FrozenIndexSet<String>>> = Mutex::new(LazyLock::new(||
-    FrozenIndexSet::new()
-));
+struct Neighbours {
+    left: String,
+    right: String,
+}
 
-fn read_graph(it: impl Iterator<Item = String>) -> DiGraphMap<usize, Direction> {
-    let mut graph = DiGraphMap::new();
-    let ids = IDS.lock().unwrap();
+fn read_graph(it: impl Iterator<Item = String>) -> HashMap<String, Neighbours> {
+    let mut map = HashMap::new();
+
     for line in it {
-        dbg!(&line);
         let NodeDef { id, left, right } = NodeDef::from(line.as_str());
-        let (id, _) =ids.insert_full(id.to_string());
-        let (left, _) =ids.insert_full(left.to_string());
-        let (right, _)=ids.insert_full(right.to_string());
-        graph.add_edge(id, left, Direction::Left);
-        graph.add_edge(id, right, Direction::Right);
-        dbg!(&graph);
+        map.insert(id, Neighbours { left, right });
     }
-    graph
+    map
 }
 
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
     it.next(); // skip a blank line
     let graph = read_graph(it);
-    // dbg!(&graph);
-    let ids = IDS.lock().unwrap();
-    let (a, _) = ids.get_full("AAA").unwrap();
-    let (z, _) = ids.get_full("ZZZ").unwrap();
-    let mut node = a;
+    let mut node = "AAA";
     let mut steps = 0;
     for turning in instructions.iter() {
-        // dbg!(&turning);
-        // dbg!(&node);
-        if node == z {
-            break
+        if node == "ZZZ" {
+            break;
         }
-node = 
-    graph.edges(node).into_iter().find(|d| d.2==turning).unwrap().1;
-steps +=1;
+        node = match turning {
+            Direction::Left => graph[node].left.as_str(),
+            Direction::Right => graph[node].right.as_str(),
+        };
+        steps += 1;
     }
     steps
 }
