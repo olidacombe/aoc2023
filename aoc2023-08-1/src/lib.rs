@@ -1,5 +1,5 @@
 #![feature(lazy_cell)]
-use std::{cell::LazyCell, sync::{LazyLock, Mutex}};
+use std::sync::{LazyLock, Mutex};
 
 use elsa::FrozenIndexSet;
 use nom::{
@@ -11,9 +11,9 @@ use nom::{
     sequence::{delimited, separated_pair},
     IResult,
 };
-use petgraph::prelude::UnGraphMap;
+use petgraph::prelude::{DiGraphMap};
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Direction {
     Left,
     Right,
@@ -31,61 +31,80 @@ impl Instructions {
     pub fn parse(input: &str) -> Self {
         Self(many0(Direction::parse)(input).unwrap().1)
     }
+    pub fn iter(&self) -> impl Iterator<Item=&Direction> {
+        self.0.iter().cycle()
+    }
 }
 
-struct NodeDef<'a> {
-    id: &'a str,
-    left: &'a str,
-    right: &'a str,
+struct NodeDef {
+    id: String,
+    left: String,
+    right: String,
 }
 
-impl<'a> From<&'a str> for NodeDef<'a> {
-    fn from(input: &'a str) -> Self {
+impl From<&str> for NodeDef {
+    fn from(input: &str) -> Self {
         Self::parse(input)
     }
 }
 
-impl<'a> NodeDef<'a> {
+impl NodeDef {
     fn neighbors(input: &str) -> IResult<&str, (&str, &str)> {
         let neighbors = separated_pair(alpha1, tag(", "), alpha1);
         delimited(char('('), neighbors, char(')'))(input)
     }
 
-    pub fn parse(input: &'a str) -> Self {
-        // let neighbors = separated_pair(alpha1, tag(", "), alpha1);
-        // let connections = delimited(char('('), neighbors, char(')'));
-        // let (_, (id, (left, right))) =
+    pub fn parse(input: &str) -> Self {
         let parsed = separated_pair(alpha1, tag(" = "), Self::neighbors)(input).unwrap();
         let (_, (id, (left, right))) = parsed;
+        let id = id.to_string();
+        let left = left.to_string();
+        let right = right.to_string();
         Self { id, left, right }
     }
 }
 
 static IDS : Mutex<LazyLock<FrozenIndexSet<String>>> = Mutex::new(LazyLock::new(||
-FrozenIndexSet::new()
+    FrozenIndexSet::new()
 ));
 
-fn read_graph<'a>(it: impl Iterator<Item = String>) -> UnGraphMap<&'static str, Direction> {
-    let mut graph = UnGraphMap::new();
+fn read_graph(it: impl Iterator<Item = String>) -> DiGraphMap<usize, Direction> {
+    let mut graph = DiGraphMap::new();
     let ids = IDS.lock().unwrap();
     for line in it {
+        dbg!(&line);
         let NodeDef { id, left, right } = NodeDef::from(line.as_str());
-        ids.insert(id.to_string());
-        ids.insert(left.to_string());
-        ids.insert(right.to_string());
-        let id = ids.get(id).unwrap();
-        let left = ids.get(left).unwrap();
-        let right = ids.get(right).unwrap();
+        let (id, _) =ids.insert_full(id.to_string());
+        let (left, _) =ids.insert_full(left.to_string());
+        let (right, _)=ids.insert_full(right.to_string());
         graph.add_edge(id, left, Direction::Left);
         graph.add_edge(id, right, Direction::Right);
+        dbg!(&graph);
     }
     graph
 }
 
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
+    it.next(); // skip a blank line
     let graph = read_graph(it);
-    u64::default()
+    // dbg!(&graph);
+    let ids = IDS.lock().unwrap();
+    let (a, _) = ids.get_full("AAA").unwrap();
+    let (z, _) = ids.get_full("ZZZ").unwrap();
+    let mut node = a;
+    let mut steps = 0;
+    for turning in instructions.iter() {
+        // dbg!(&turning);
+        // dbg!(&node);
+        if node == z {
+            break
+        }
+node = 
+    graph.edges(node).into_iter().find(|d| d.2==turning).unwrap().1;
+steps +=1;
+    }
+    steps
 }
 
 #[cfg(test)]
