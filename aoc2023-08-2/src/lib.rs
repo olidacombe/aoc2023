@@ -87,9 +87,16 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     it.next(); // skip a blank line
     let (graph, mut nodes) = read_graph(it);
     println!("Directions len: {}", &instructions.0.len());
+    println!("Nodes len: {}", &graph.keys().len());
     dbg!(&nodes);
     let mut steps = 0;
+    let mut record_zs = 0;
     for turning in instructions.iter() {
+        let num_zs = nodes.iter().filter(|n| n.ends_with("Z")).count();
+        if num_zs > record_zs {
+            println!("{num_zs} Zs at {steps}");
+            record_zs = num_zs;
+        }
         if nodes.iter().all(|n| n.ends_with("Z")) {
             break;
         }
