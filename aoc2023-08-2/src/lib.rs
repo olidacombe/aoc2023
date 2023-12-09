@@ -30,8 +30,8 @@ impl Instructions {
     pub fn parse(input: &str) -> Self {
         Self(many0(Direction::parse)(input).unwrap().1)
     }
-    pub fn iter(&self) -> impl Iterator<Item = &Direction> {
-        self.0.iter().cycle()
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &Direction)> {
+        self.0.iter().enumerate().cycle()
     }
 }
 
@@ -85,16 +85,18 @@ fn read_graph(it: impl Iterator<Item = String>) -> (HashMap<String, Neighbours>,
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
     it.next(); // skip a blank line
-    let (graph, mut nodes) = read_graph(it);
+    let (graph, initial_nodes) = read_graph(it);
+    let mut nodes: Vec<&str> = initial_nodes.iter().map(String::as_str).collect();
     println!("Directions len: {}", &instructions.0.len());
     println!("Nodes len: {}", &graph.keys().len());
     dbg!(&nodes);
     let mut steps = 0;
     let mut record_zs = 0;
-    for turning in instructions.iter() {
+    for (instruction_num, turning) in instructions.iter() {
+        // println!("{instruction_num}");
         let num_zs = nodes.iter().filter(|n| n.ends_with("Z")).count();
         if num_zs > record_zs {
-            println!("{num_zs} Zs at {steps}");
+            println!("{num_zs} Zs at {steps} ({instruction_num})");
             record_zs = num_zs;
         }
         if nodes.iter().all(|n| n.ends_with("Z")) {
@@ -102,8 +104,8 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
         }
         nodes.par_iter_mut().for_each(|node| {
             *node = match turning {
-                Direction::Left => graph[node].left.clone(),
-                Direction::Right => graph[node].right.clone(),
+                Direction::Left => &graph[*node].left.as_str(),
+                Direction::Right => &graph[*node].right.as_str(),
             }
         });
         steps += 1;
