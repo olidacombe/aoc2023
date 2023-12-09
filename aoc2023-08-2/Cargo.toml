@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 nom = { workspace = true }
+rayon = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]

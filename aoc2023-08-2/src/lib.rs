@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 use nom::{
@@ -22,6 +23,7 @@ impl Direction {
     }
 }
 
+#[derive(Debug)]
 struct Instructions(Vec<Direction>);
 
 impl Instructions {
@@ -84,17 +86,19 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
     it.next(); // skip a blank line
     let (graph, mut nodes) = read_graph(it);
+    println!("Directions len: {}", &instructions.0.len());
+    dbg!(&nodes);
     let mut steps = 0;
     for turning in instructions.iter() {
         if nodes.iter().all(|n| n.ends_with("Z")) {
             break;
         }
-        for node in nodes.iter_mut() {
+        nodes.par_iter_mut().for_each(|node| {
             *node = match turning {
                 Direction::Left => graph[node].left.clone(),
                 Direction::Right => graph[node].right.clone(),
-            };
-        }
+            }
+        });
         steps += 1;
     }
     steps
