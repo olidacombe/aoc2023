@@ -1,3 +1,8 @@
+//! ```
+//! 1 Zs at 14363 (0)
+//! 2 Zs at 847417 (0)
+//! 3 Zs at 51692437 (0)
+//! ```
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -124,9 +129,10 @@ impl<'a> NodeFollower<'a> {
         if let Some(mu) = self.seen.get(&(node, step)) {
             // we have found cycle!
             self.mu_lambda = Some((*mu, self.counter - mu));
-            self.zs.retain(|i| i <= &mu);
+            self.zs.retain(|i| i >= &mu);
             self.zs.iter_mut().for_each(|i| *i -= mu);
             self.seen.clear();
+            dbg!(&self.zs);
         } else {
             if self.is_z() {
                 self.zs.push(self.counter);
@@ -143,7 +149,6 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let mut nodes: Vec<NodeFollower> = initial_nodes.iter().map(NodeFollower::new).collect();
     println!("Directions len: {}", &instructions.0.len());
     println!("Nodes len: {}", &graph.keys().len());
-    dbg!(&nodes);
     let mut steps = 0;
     let mut record_cycling = 0;
     for (instruction_num, turning) in instructions.iter() {
@@ -151,11 +156,11 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
             // we got pretty lucky
             return steps;
         }
-        let num_cycling = nodes.iter().filter(|n| n.cycling()).count();
-        if num_cycling > record_cycling {
-            println!("{num_cycling} Zs at {steps} ({instruction_num})");
-            record_cycling = num_cycling;
-        }
+        // let num_cycling = nodes.iter().filter(|n| n.cycling()).count();
+        // if num_cycling > record_cycling {
+        //     println!("{num_cycling} cycling at {steps} ({instruction_num})");
+        //     record_cycling = num_cycling;
+        // }
         if nodes.iter().all(|n| n.cycling()) {
             // stop brute-force running, we've seen all we need for each node path
             break;
@@ -172,6 +177,7 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
         steps += 1;
     }
 
+    dbg!(&nodes);
     // TODO not this, use our `nodes` vec, which should all have their cycle information
     // to work with.
     steps
