@@ -82,34 +82,98 @@ fn read_graph(it: impl Iterator<Item = String>) -> (HashMap<String, Neighbours>,
     (map, start_nodes)
 }
 
+#[derive(Debug)]
+struct NodeFollower<'a> {
+    pub node: &'a str,
+    counter: usize,
+    mu_lambda: Option<(usize, usize)>,
+    seen: HashMap<(&'a str, usize), usize>,
+    step: usize,
+    zs: Vec<usize>,
+}
+
+impl<'a> NodeFollower<'a> {
+    pub fn new<S: AsRef<str>>(node: &'a S) -> Self {
+        Self {
+            counter: 0,
+            mu_lambda: None,
+            node: node.as_ref(),
+            seen: HashMap::from_iter([((node.as_ref(), 0), 0)]),
+            step: 0,
+            zs: Vec::new(),
+        }
+    }
+
+    /// returns true if this follower has detected the node path's cycle
+    pub fn cycling(&self) -> bool {
+        self.mu_lambda.is_some()
+    }
+
+    pub fn is_z(&self) -> bool {
+        self.node.ends_with("Z")
+    }
+
+    pub fn update<S: AsRef<str>>(&mut self, node: &'a S, step: usize) {
+        self.counter += 1;
+        let node = node.as_ref();
+        self.node = node;
+        self.step = step;
+        if self.cycling() {
+            return;
+        }
+        if let Some(mu) = self.seen.get(&(node, step)) {
+            // we have found cycle!
+            self.mu_lambda = Some((*mu, self.counter - mu));
+            self.zs.retain(|i| i <= &mu);
+            self.zs.iter_mut().for_each(|i| *i -= mu);
+            self.seen.clear();
+        } else {
+            if self.is_z() {
+                self.zs.push(self.counter);
+            }
+            self.seen.insert((self.node, step), self.counter);
+        }
+    }
+}
+
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
     it.next(); // skip a blank line
     let (graph, initial_nodes) = read_graph(it);
-    let mut nodes: Vec<&str> = initial_nodes.iter().map(String::as_str).collect();
+    let mut nodes: Vec<NodeFollower> = initial_nodes.iter().map(NodeFollower::new).collect();
     println!("Directions len: {}", &instructions.0.len());
     println!("Nodes len: {}", &graph.keys().len());
     dbg!(&nodes);
     let mut steps = 0;
-    let mut record_zs = 0;
+    let mut record_cycling = 0;
     for (instruction_num, turning) in instructions.iter() {
-        // println!("{instruction_num}");
-        let num_zs = nodes.iter().filter(|n| n.ends_with("Z")).count();
-        if num_zs > record_zs {
-            println!("{num_zs} Zs at {steps} ({instruction_num})");
-            record_zs = num_zs;
+        if nodes.iter().all(|n| n.is_z()) {
+            // we got pretty lucky
+            return steps;
         }
-        if nodes.iter().all(|n| n.ends_with("Z")) {
+        let num_cycling = nodes.iter().filter(|n| n.cycling()).count();
+        if num_cycling > record_cycling {
+            println!("{num_cycling} Zs at {steps} ({instruction_num})");
+            record_cycling = num_cycling;
+        }
+        if nodes.iter().all(|n| n.cycling()) {
+            // stop brute-force running, we've seen all we need for each node path
             break;
         }
         nodes.par_iter_mut().for_each(|node| {
-            *node = match turning {
-                Direction::Left => &graph[*node].left.as_str(),
-                Direction::Right => &graph[*node].right.as_str(),
-            }
+            node.update(
+                match turning {
+                    Direction::Left => &graph[node.node].left,
+                    Direction::Right => &graph[node.node].right,
+                },
+                instruction_num,
+            )
         });
         steps += 1;
     }
+
+    // TODO not this, use our `nodes` vec, which should all have their cycle information
+    // to work with.
     steps
 }
 
