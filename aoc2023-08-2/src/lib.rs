@@ -138,7 +138,6 @@ impl<'a> NodeFollower<'a> {
             self.zs.retain(|i| i >= &mu);
             self.zs.iter_mut().for_each(|i| *i -= mu);
             self.seen.clear();
-            dbg!(&self.zs);
         } else {
             if self.is_z() {
                 self.zs.push(self.counter);
@@ -212,6 +211,8 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
         steps += 1;
     }
 
+    // brute force the congruences, just about doable!
+    println!("Seeking {} hits...", nodes.len() - 1);
     let mut hit_count_record = 0;
     for idx in nodes.pop().unwrap() {
         let hit_count = nodes.iter().filter(|n| n.z_test(idx)).count();
