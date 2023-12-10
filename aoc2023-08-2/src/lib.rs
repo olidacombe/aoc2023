@@ -118,6 +118,12 @@ impl<'a> NodeFollower<'a> {
         self.node.ends_with("Z")
     }
 
+    pub fn z_test(&self, candidate: usize) -> bool {
+        let (mu, lambda) = self.mu_lambda.unwrap();
+        let candidate = (candidate - mu) % lambda;
+        self.zs.iter().find(|v| *v == &candidate).is_some()
+    }
+
     pub fn update<S: AsRef<str>>(&mut self, node: &'a S, step: usize) {
         self.counter += 1;
         let node = node.as_ref();
@@ -142,6 +148,41 @@ impl<'a> NodeFollower<'a> {
     }
 }
 
+impl<'a> IntoIterator for NodeFollower<'a> {
+    type Item = usize;
+    type IntoIter = CycleIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let (mu, lambda) = self.mu_lambda.unwrap();
+        CycleIter {
+            current: mu,
+            lambda,
+            zs: self.zs,
+            z_idx: 0,
+        }
+    }
+}
+
+struct CycleIter {
+    current: usize,
+    lambda: usize,
+    zs: Vec<usize>,
+    z_idx: usize,
+}
+
+impl Iterator for CycleIter {
+    type Item = usize;
+    fn next(&mut self) -> Option<Self::Item> {
+        let v = self.current + self.zs[self.z_idx];
+        self.z_idx += 1;
+        if self.z_idx >= self.zs.len() {
+            self.z_idx = 0;
+            self.current += self.lambda;
+        }
+        Some(v)
+    }
+}
+
 pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     let instructions = Instructions::parse(it.next().unwrap().as_str());
     it.next(); // skip a blank line
@@ -150,17 +191,11 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
     println!("Directions len: {}", &instructions.0.len());
     println!("Nodes len: {}", &graph.keys().len());
     let mut steps = 0;
-    let mut record_cycling = 0;
     for (instruction_num, turning) in instructions.iter() {
         if nodes.iter().all(|n| n.is_z()) {
             // we got pretty lucky
             return steps;
         }
-        // let num_cycling = nodes.iter().filter(|n| n.cycling()).count();
-        // if num_cycling > record_cycling {
-        //     println!("{num_cycling} cycling at {steps} ({instruction_num})");
-        //     record_cycling = num_cycling;
-        // }
         if nodes.iter().all(|n| n.cycling()) {
             // stop brute-force running, we've seen all we need for each node path
             break;
@@ -177,9 +212,17 @@ pub fn count_steps(mut it: impl Iterator<Item = String>) -> u64 {
         steps += 1;
     }
 
-    dbg!(&nodes);
-    // TODO not this, use our `nodes` vec, which should all have their cycle information
-    // to work with.
+    let mut hit_count_record = 0;
+    for idx in nodes.pop().unwrap() {
+        let hit_count = nodes.iter().filter(|n| n.z_test(idx)).count();
+        if hit_count > hit_count_record {
+            hit_count_record = hit_count;
+            println!("{hit_count} hits at {idx}");
+        }
+        if nodes.iter().all(|n| n.z_test(idx)) {
+            return idx as u64;
+        }
+    }
     steps
 }
 
