@@ -1,8 +1,3 @@
-//! ```
-//! 1 Zs at 14363 (0)
-//! 2 Zs at 847417 (0)
-//! 3 Zs at 51692437 (0)
-//! ```
 use rayon::prelude::*;
 use std::collections::HashMap;
 

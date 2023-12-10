@@ -1,0 +1,11 @@
+[package]
+name = "aoc2023-09-2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aoc2023-09-1 = { path = "../aoc2023-09-1" }
+nom = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }

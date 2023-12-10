@@ -5,7 +5,7 @@ fn parse_seq(line: &str) -> IResult<&str, Vec<i64>> {
 }
 
 #[derive(Debug)]
-struct Seq(Vec<i64>);
+pub struct Seq(Vec<i64>);
 
 impl From<&str> for Seq {
     fn from(value: &str) -> Self {
@@ -36,6 +36,11 @@ impl Seq {
         } else {
             self.0.last().unwrap() + self.diffs().extrapolate()
         }
+    }
+
+    pub fn reversed(mut self) -> Self {
+        self.0.reverse();
+        self
     }
 }
 
