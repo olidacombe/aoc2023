@@ -169,8 +169,6 @@ struct NetWalker {
     pub age: usize,
 }
 
-impl NetWalker {}
-
 pub fn farthest_point(it: impl Iterator<Item = String>) -> u64 {
     let network = Network::from(it);
     let mut walkers = network.walkers();
