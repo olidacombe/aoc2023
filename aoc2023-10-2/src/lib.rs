@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::Add};
 
 struct Network {
     start: (usize, usize),
@@ -85,15 +85,6 @@ impl Network {
         walkers
     }
 
-    fn tip_column(&mut self, walker: &NetWalker, multiplier: i32) {
-        for i in 0..walker.row {
-            self.interiousity[i][walker.col] -= multiplier;
-        }
-        for i in (walker.row + 1)..self.interiousity.len() {
-            self.interiousity[i][walker.col] += multiplier;
-        }
-    }
-
     fn tip_row(&mut self, walker: &NetWalker, multiplier: i32) {
         for i in 0..walker.col {
             self.interiousity[walker.row][i] -= multiplier;
@@ -132,38 +123,27 @@ impl Network {
         }
         let other_dir = other_dir.unwrap();
         match came_from {
-            Direction::Left => {
-                self.tip_column(&walker, 1);
-                match other_dir {
-                    Direction::Down => self.tip_row(&walker, -1),
-                    Direction::Up => self.tip_row(&walker, 1),
-                    _ => {}
-                }
-            }
+            Direction::Left => match other_dir {
+                Direction::Down => self.tip_row(&walker, -1),
+                Direction::Up => self.tip_row(&walker, 1),
+                _ => {}
+            },
             Direction::Down => {
                 self.tip_row(&walker, 1);
                 match other_dir {
-                    Direction::Left => self.tip_column(&walker, -1),
-                    Direction::Right => self.tip_column(&walker, 1),
+                    Direction::Up => self.tip_row(&(walker + (0, -1)), 1),
                     _ => {}
                 }
             }
-            Direction::Right => {
-                self.tip_column(&walker, -1);
-                match other_dir {
-                    Direction::Down => self.tip_row(&walker, 1),
-                    Direction::Up => self.tip_row(&walker, -1),
-                    _ => {}
-                }
-            }
-            Direction::Up => {
-                self.tip_row(&walker, -1);
-                match other_dir {
-                    Direction::Left => self.tip_column(&walker, 1),
-                    Direction::Right => self.tip_column(&walker, -1),
-                    _ => {}
-                }
-            }
+            Direction::Right => match other_dir {
+                Direction::Down => self.tip_row(&walker, 1),
+                Direction::Up => self.tip_row(&walker, -1),
+                _ => {}
+            },
+            Direction::Up => match other_dir {
+                Direction::Down => self.tip_row(&(walker + (1, 0)), -1),
+                _ => {}
+            },
         }
     }
 
@@ -174,23 +154,19 @@ impl Network {
         match walker.came_from {
             Direction::Left => match pipe {
                 '-' => {
-                    self.tip_column(&walker, 1);
                     walker.col += 1;
                 }
                 'J' => {
-                    self.tip_column(&walker, 1);
-                    self.tip_row(&walker, 1);
                     walker.row -= 1;
+                    self.tip_row(&walker, 1);
                     walker.came_from = Direction::Down;
                 }
                 '7' => {
-                    self.tip_column(&walker, 1);
-                    self.tip_row(&walker, -1);
                     walker.row += 1;
+                    self.tip_row(&walker, -1);
                     walker.came_from = Direction::Up;
                 }
                 'S' => {
-                    self.tip_start(&walker, Direction::Left);
                     return true;
                 }
                 _ => {
@@ -199,23 +175,18 @@ impl Network {
             },
             Direction::Down => match pipe {
                 '|' => {
-                    self.tip_row(&walker, 1);
                     walker.row -= 1;
+                    self.tip_row(&walker, 1);
                 }
                 'F' => {
-                    self.tip_row(&walker, 1);
-                    self.tip_column(&walker, 1);
                     walker.col += 1;
                     walker.came_from = Direction::Left;
                 }
                 '7' => {
-                    self.tip_row(&walker, 1);
-                    self.tip_column(&walker, -1);
                     walker.col -= 1;
                     walker.came_from = Direction::Right;
                 }
                 'S' => {
-                    self.tip_start(&walker, Direction::Down);
                     return true;
                 }
                 _ => {
@@ -224,23 +195,19 @@ impl Network {
             },
             Direction::Right => match pipe {
                 '-' => {
-                    self.tip_column(&walker, -1);
                     walker.col -= 1;
                 }
                 'L' => {
-                    self.tip_column(&walker, -1);
-                    self.tip_row(&walker, 1);
                     walker.row -= 1;
+                    self.tip_row(&walker, 1);
                     walker.came_from = Direction::Down;
                 }
                 'F' => {
-                    self.tip_column(&walker, -1);
-                    self.tip_row(&walker, -1);
                     walker.row += 1;
+                    self.tip_row(&walker, -1);
                     walker.came_from = Direction::Up;
                 }
                 'S' => {
-                    self.tip_start(&walker, Direction::Right);
                     return true;
                 }
                 _ => {
@@ -249,23 +216,19 @@ impl Network {
             },
             Direction::Up => match pipe {
                 '|' => {
-                    self.tip_row(&walker, -1);
                     walker.row += 1;
+                    self.tip_row(&walker, -1);
                 }
                 'J' => {
-                    self.tip_row(&walker, -1);
-                    self.tip_column(&walker, -1);
                     walker.col -= 1;
                     walker.came_from = Direction::Right;
                 }
                 'L' => {
-                    self.tip_row(&walker, -1);
-                    self.tip_column(&walker, 1);
                     walker.col += 1;
                     walker.came_from = Direction::Left;
                 }
                 'S' => {
-                    self.tip_start(&walker, Direction::Up);
+                    self.tip_row(&walker, -1);
                     return true;
                 }
                 _ => {
@@ -294,7 +257,7 @@ impl Network {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum Direction {
     Right,
     Up,
@@ -302,12 +265,23 @@ enum Direction {
     Down,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct NetWalker {
     pub came_from: Direction,
     pub row: usize,
     pub col: usize,
     pub age: usize,
+}
+
+impl Add<(i32, i32)> for &NetWalker {
+    type Output = NetWalker;
+
+    fn add(self, rhs: (i32, i32)) -> Self::Output {
+        let mut ret = self.clone();
+        ret.row = (ret.row as i32 + rhs.0) as usize;
+        ret.col = (ret.col as i32 + rhs.1) as usize;
+        ret
+    }
 }
 
 pub fn num_enclosed_tiles(it: impl Iterator<Item = String>) -> u64 {
