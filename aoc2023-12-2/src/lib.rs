@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rayon::prelude::*;
 use std::{iter::repeat, ops::Add};
 
 use nom::{
@@ -158,7 +159,7 @@ impl PossibleArrangements {
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> u64 {
     let records: Vec<ConditionRecord> = it.map(ConditionRecord::from).collect();
     records
-        .iter()
+        .par_iter()
         .map(|r| r.possible_arrangements().len())
         .sum()
 }

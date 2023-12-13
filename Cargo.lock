@@ -234,6 +234,7 @@ dependencies = [
  "indoc",
  "itertools",
  "nom",
+ "rayon",
 ]
 
 [[package]]
