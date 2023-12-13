@@ -44,7 +44,7 @@ impl ConditionRecord {
         if self.known.len() < 1 {
             return PossibleArrangements::default();
         }
-        println!("{} {}", &self.known, self.damage_sizes.iter().join(","));
+        // println!("{} {}", &self.known, self.damage_sizes.iter().join(","));
         if self.known == "." && self.damage_sizes.is_empty() {
             return vec!["."].into();
         }
@@ -95,7 +95,7 @@ impl ConditionRecord {
             }
             _ => {}
         }
-        println!("---");
+        // println!("---");
         PossibleArrangements::default()
     }
 
