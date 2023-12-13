@@ -228,6 +228,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc2023-12-2"
+version = "0.1.0"
+dependencies = [
+ "indoc",
+ "itertools",
+ "nom",
+]
+
+[[package]]
 name = "array-macro"
 version = "2.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
