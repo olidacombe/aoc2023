@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 itertools = { workspace = true }
 nom = { workspace = true }
+rayon = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }
