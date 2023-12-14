@@ -1,6 +1,9 @@
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::{iter::repeat, ops::Add};
+use std::{
+    iter::repeat,
+    ops::{Add, Mul},
+};
 
 use nom::{
     bytes::complete::{tag, take_while1},
@@ -18,14 +21,29 @@ struct ConditionRecord {
 impl From<String> for ConditionRecord {
     fn from(line: String) -> Self {
         let (known, damage_sizes) = parse_condition_record(line.as_str()).unwrap().1;
+        ConditionRecord {
+            known: known.to_string(),
+            damage_sizes,
+        }
+    }
+}
+
+impl Mul<usize> for ConditionRecord {
+    type Output = Self;
+
+    fn mul(self, n: usize) -> Self::Output {
+        let Self {
+            known,
+            damage_sizes,
+        } = self;
+        let known = repeat(known).take(n).join("?").to_string();
         let damage_sizes = damage_sizes
             .iter()
             .cloned()
             .cycle()
-            .take(damage_sizes.len() * 5)
+            .take(damage_sizes.len() * n)
             .collect();
-        let known = repeat(known).take(5).join("?").to_string();
-        ConditionRecord {
+        Self {
             known,
             damage_sizes,
         }
@@ -54,9 +72,11 @@ impl ConditionRecord {
         }
         // println!("{} {}", &self.known, self.damage_sizes.iter().join(","));
         if self.known == "." && self.damage_sizes.is_empty() {
+            // println!("Arrangement found!");
             return vec!["."].into();
         }
         if self.known == "#" && self.damage_sizes == [1] {
+            // println!("Arrangement found!");
             return vec!["#"].into();
         }
         let (first, rest) = self.known.split_at(1);
@@ -157,7 +177,7 @@ impl PossibleArrangements {
 }
 
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> u64 {
-    let records: Vec<ConditionRecord> = it.map(ConditionRecord::from).collect();
+    let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
         .par_iter()
         .map(|r| r.possible_arrangements().len())
