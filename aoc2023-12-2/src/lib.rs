@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
-    iter::repeat,
+    iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
 };
 
@@ -13,9 +13,20 @@ use nom::{
     IResult,
 };
 
-fn possible_arrangements(mut damage_sizes: Vec<usize>, length: usize) -> PossibleArrangements {
-    dbg!(&damage_sizes);
-    dbg!(&length);
+fn validate(candidate: &str, filter: &str) -> bool {
+    for (c, v) in zip(candidate.chars(), filter.chars()) {
+        if v == '?' {
+            continue;
+        }
+        if c != v {
+            return false;
+        }
+    }
+    true
+}
+
+fn possible_arrangements(mut damage_sizes: Vec<usize>, filter: &str) -> PossibleArrangements {
+    let length = filter.len();
     let k = damage_sizes.len();
     if k == 0 {
         return vec![str::repeat(".", length)].into();
@@ -31,11 +42,19 @@ fn possible_arrangements(mut damage_sizes: Vec<usize>, length: usize) -> Possibl
     if !damage_sizes.is_empty() {
         midfix = format!(".{}", midfix);
     }
-    dbg!(&midfix);
+
     for suffix_dots in 0..free_dots + 1 {
         let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
-        arrangements +=
-            possible_arrangements(damage_sizes.clone(), length - suffix.len()).append(&suffix);
+        let suffix_len = suffix.len();
+        let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
+
+        if !validate(suffix.as_str(), suffix_filter) {
+            continue;
+        }
+
+        arrangements += possible_arrangements(damage_sizes.clone(), prefix_filter)
+            .append(&suffix)
+            .filtered(filter);
     }
 
     arrangements.into()
@@ -206,6 +225,11 @@ impl PossibleArrangements {
         Self(self.0.iter().map(|s| s.to_owned() + prefix).collect())
     }
 
+    fn filtered(mut self, filter: &str) -> Self {
+        self.0.retain(|s| validate(s, filter));
+        self
+    }
+
     fn prepend(&self, prefix: &str) -> Self {
         Self(self.0.iter().map(|s| prefix.to_owned() + s).collect())
     }
@@ -219,7 +243,7 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
         .par_iter()
-        .map(|r| r.possible_arrangements().len())
+        .map(|r| possible_arrangements(r.damage_sizes.clone(), r.known.as_str()).len())
         .sum()
 }
 
@@ -231,7 +255,7 @@ mod test {
     #[test]
     fn all_arrangements_from_damage_sizes_simple() {
         let damages = vec![1, 2];
-        let arrangements = possible_arrangements(damages, 7);
+        let arrangements = possible_arrangements(damages, "???????");
         assert_eq!(
             arrangements,
             vec![
