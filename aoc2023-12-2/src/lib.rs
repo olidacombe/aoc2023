@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
     iter::repeat,
-    ops::{Add, Mul},
+    ops::{Add, AddAssign, Mul},
 };
 
 use nom::{
@@ -13,9 +13,37 @@ use nom::{
     IResult,
 };
 
+fn possible_arrangements(mut damage_sizes: Vec<usize>, length: usize) -> PossibleArrangements {
+    dbg!(&damage_sizes);
+    dbg!(&length);
+    let k = damage_sizes.len();
+    if k == 0 {
+        return vec![str::repeat(".", length)].into();
+    }
+    let mandatory_size = damage_sizes.iter().sum::<usize>() + k - 1; // all the # groups plus a .
+    let free_dots = length - mandatory_size;
+
+    let n = damage_sizes.pop().unwrap();
+
+    let mut arrangements = PossibleArrangements::default();
+
+    let mut midfix = str::repeat("#", n);
+    if !damage_sizes.is_empty() {
+        midfix = format!(".{}", midfix);
+    }
+    dbg!(&midfix);
+    for suffix_dots in 0..free_dots + 1 {
+        let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
+        arrangements +=
+            possible_arrangements(damage_sizes.clone(), length - suffix.len()).append(&suffix);
+    }
+
+    arrangements.into()
+}
+
 struct ConditionRecord {
     known: String,
-    damage_sizes: Vec<u64>,
+    damage_sizes: Vec<usize>,
 }
 
 impl From<String> for ConditionRecord {
@@ -23,7 +51,7 @@ impl From<String> for ConditionRecord {
         let (known, damage_sizes) = parse_condition_record(line.as_str()).unwrap().1;
         ConditionRecord {
             known: known.to_string(),
-            damage_sizes,
+            damage_sizes: damage_sizes.iter().map(|s| *s as usize).collect(),
         }
     }
 }
@@ -50,7 +78,7 @@ impl Mul<usize> for ConditionRecord {
     }
 }
 
-fn vec_decrement(vec: &Vec<u64>) -> Vec<u64> {
+fn vec_decrement(vec: &Vec<usize>) -> Vec<usize> {
     if vec.len() == 0 {
         return Vec::new();
     }
@@ -127,7 +155,7 @@ impl ConditionRecord {
         PossibleArrangements::default()
     }
 
-    fn new(known: String, damage_sizes: Vec<u64>) -> Self {
+    fn new(known: String, damage_sizes: Vec<usize>) -> Self {
         Self {
             known,
             damage_sizes,
@@ -158,6 +186,7 @@ impl From<Vec<&str>> for PossibleArrangements {
     }
 }
 
+// TODO replate .append with + :D
 impl Add for PossibleArrangements {
     type Output = Self;
 
@@ -166,17 +195,27 @@ impl Add for PossibleArrangements {
     }
 }
 
+impl AddAssign for PossibleArrangements {
+    fn add_assign(&mut self, mut rhs: Self) {
+        self.0.append(&mut rhs.0);
+    }
+}
+
 impl PossibleArrangements {
+    fn append(&self, prefix: &str) -> Self {
+        Self(self.0.iter().map(|s| s.to_owned() + prefix).collect())
+    }
+
     fn prepend(&self, prefix: &str) -> Self {
         Self(self.0.iter().map(|s| prefix.to_owned() + s).collect())
     }
 
-    fn len(&self) -> u64 {
-        self.0.len() as u64
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
-pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> u64 {
+pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
         .par_iter()
@@ -188,6 +227,20 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> u64 {
 mod test {
     use super::*;
     use indoc::indoc;
+
+    #[test]
+    fn all_arrangements_from_damage_sizes_simple() {
+        let damages = vec![1, 2];
+        let arrangements = possible_arrangements(damages, 7);
+        assert_eq!(
+            arrangements,
+            vec![
+                "...#.##", "..#..##", ".#...##", "#....##", "..#.##.", ".#..##.", "#...##.",
+                ".#.##..", "#..##..", "#.##..."
+            ]
+            .into()
+        );
+    }
 
     #[test]
     fn full_example() {
