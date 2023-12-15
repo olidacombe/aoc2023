@@ -25,18 +25,21 @@ fn validate(candidate: &str, filter: &str) -> bool {
     true
 }
 
-fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> PossibleArrangements {
+fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     let length = filter.len();
     let k = damage_sizes.len();
     if k == 0 {
-        return vec![str::repeat(".", length)].into();
+        if validate(&str::repeat(".", length), filter) {
+            return 1;
+        }
+        return 0;
     }
     let mandatory_size = damage_sizes.iter().sum::<usize>() + k - 1; // all the # groups plus a .
     let free_dots = length - mandatory_size;
 
     let (n, damage_sizes) = damage_sizes.split_last().unwrap();
 
-    let mut arrangements = PossibleArrangements::default();
+    let mut arrangements = 0;
 
     let mut midfix = str::repeat("#", *n);
     if !damage_sizes.is_empty() {
@@ -52,8 +55,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> PossibleArrang
             continue;
         }
 
-        arrangements +=
-            (possible_arrangements(damage_sizes, prefix_filter) + &suffix).filtered(filter);
+        arrangements += possible_arrangements(damage_sizes, prefix_filter);
     }
 
     arrangements.into()
@@ -135,25 +137,13 @@ impl AddAssign for PossibleArrangements {
     }
 }
 
-impl PossibleArrangements {
-    fn filtered(mut self, filter: &str) -> Self {
-        self.0.retain(|s| validate(s, filter));
-        self
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
         .par_iter()
         .map(|r| {
-            println!("{:?}", &r);
-            let ret = possible_arrangements(&r.damage_sizes, r.known.as_str()).len();
-            println!("  = {}", &ret);
+            let ret = possible_arrangements(&r.damage_sizes, r.known.as_str());
+            println!("{:?} = {}", &r, &ret);
             ret
         })
         .sum()
@@ -163,20 +153,6 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
 mod test {
     use super::*;
     use indoc::indoc;
-
-    #[test]
-    fn all_arrangements_from_damage_sizes_simple() {
-        let damages = &[1, 2];
-        let arrangements = possible_arrangements(damages, "???????");
-        assert_eq!(
-            arrangements,
-            vec![
-                "...#.##", "..#..##", ".#...##", "#....##", "..#.##.", ".#..##.", "#...##.",
-                ".#.##..", "#..##..", "#.##..."
-            ]
-            .into()
-        );
-    }
 
     #[test]
     fn full_example() {
