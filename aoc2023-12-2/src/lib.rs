@@ -13,6 +13,7 @@ use nom::{
     IResult,
 };
 
+#[derive(Debug)]
 struct ConditionRecord {
     known: String,
     damage_sizes: Vec<u64>,
@@ -179,8 +180,13 @@ impl PossibleArrangements {
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> u64 {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
-        .par_iter()
-        .map(|r| r.possible_arrangements().len())
+        .into_par_iter()
+        .map(|r| {
+            println!("{:?}", &r);
+            let ret = r.possible_arrangements().len();
+            println!(" = {}", &ret);
+            ret
+        })
         .sum()
 }
 
