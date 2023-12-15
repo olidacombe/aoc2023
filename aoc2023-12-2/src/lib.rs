@@ -52,9 +52,8 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> PossibleArrang
             continue;
         }
 
-        arrangements += possible_arrangements(damage_sizes, prefix_filter)
-            .append(&suffix)
-            .filtered(filter);
+        arrangements +=
+            (possible_arrangements(damage_sizes, prefix_filter) + &suffix).filtered(filter);
     }
 
     arrangements.into()
@@ -122,11 +121,11 @@ impl From<Vec<&str>> for PossibleArrangements {
 }
 
 // TODO replate .append with + :D
-impl Add for PossibleArrangements {
+impl Add<&str> for PossibleArrangements {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
-        Self([self.0, rhs.0].concat())
+    fn add(self, prefix: &str) -> Self::Output {
+        Self(self.0.into_iter().map(|s| s.to_owned() + prefix).collect())
     }
 }
 
@@ -137,10 +136,6 @@ impl AddAssign for PossibleArrangements {
 }
 
 impl PossibleArrangements {
-    fn append(&self, prefix: &str) -> Self {
-        Self(self.0.iter().map(|s| s.to_owned() + prefix).collect())
-    }
-
     fn filtered(mut self, filter: &str) -> Self {
         self.0.retain(|s| validate(s, filter));
         self
@@ -156,8 +151,9 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     records
         .par_iter()
         .map(|r| {
+            println!("{:?}", &r);
             let ret = possible_arrangements(&r.damage_sizes, r.known.as_str()).len();
-            println!("{:?} = {}", &r, &ret);
+            println!("  = {}", &ret);
             ret
         })
         .sum()
