@@ -25,7 +25,7 @@ fn validate(candidate: &str, filter: &str) -> bool {
     true
 }
 
-fn possible_arrangements(mut damage_sizes: Vec<usize>, filter: &str) -> PossibleArrangements {
+fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> PossibleArrangements {
     let length = filter.len();
     let k = damage_sizes.len();
     if k == 0 {
@@ -34,11 +34,11 @@ fn possible_arrangements(mut damage_sizes: Vec<usize>, filter: &str) -> Possible
     let mandatory_size = damage_sizes.iter().sum::<usize>() + k - 1; // all the # groups plus a .
     let free_dots = length - mandatory_size;
 
-    let n = damage_sizes.pop().unwrap();
+    let (n, damage_sizes) = damage_sizes.split_last().unwrap();
 
     let mut arrangements = PossibleArrangements::default();
 
-    let mut midfix = str::repeat("#", n);
+    let mut midfix = str::repeat("#", *n);
     if !damage_sizes.is_empty() {
         midfix = format!(".{}", midfix);
     }
@@ -52,7 +52,7 @@ fn possible_arrangements(mut damage_sizes: Vec<usize>, filter: &str) -> Possible
             continue;
         }
 
-        arrangements += possible_arrangements(damage_sizes.clone(), prefix_filter)
+        arrangements += possible_arrangements(damage_sizes, prefix_filter)
             .append(&suffix)
             .filtered(filter);
     }
@@ -60,6 +60,7 @@ fn possible_arrangements(mut damage_sizes: Vec<usize>, filter: &str) -> Possible
     arrangements.into()
 }
 
+#[derive(Debug)]
 struct ConditionRecord {
     known: String,
     damage_sizes: Vec<usize>,
@@ -90,91 +91,6 @@ impl Mul<usize> for ConditionRecord {
             .cycle()
             .take(damage_sizes.len() * n)
             .collect();
-        Self {
-            known,
-            damage_sizes,
-        }
-    }
-}
-
-fn vec_decrement(vec: &Vec<usize>) -> Vec<usize> {
-    if vec.len() == 0 {
-        return Vec::new();
-    }
-    let (first, rest) = vec.split_first().unwrap();
-    if *first == 1 {
-        rest.to_vec()
-    } else {
-        let mut ret = vec.clone();
-        let first = ret.first_mut().unwrap();
-        *first -= 1;
-        ret
-    }
-}
-
-impl ConditionRecord {
-    fn possible_arrangements(&self) -> PossibleArrangements {
-        if self.known.len() < 1 {
-            return PossibleArrangements::default();
-        }
-        // println!("{} {}", &self.known, self.damage_sizes.iter().join(","));
-        if self.known == "." && self.damage_sizes.is_empty() {
-            // println!("Arrangement found!");
-            return vec!["."].into();
-        }
-        if self.known == "#" && self.damage_sizes == [1] {
-            // println!("Arrangement found!");
-            return vec!["#"].into();
-        }
-        let (first, rest) = self.known.split_at(1);
-        match first {
-            "." => {
-                return Self::new(rest.to_owned(), self.damage_sizes.clone())
-                    .possible_arrangements()
-                    .prepend(".");
-            }
-            "?" => {
-                return Self::new(".".to_owned() + rest, self.damage_sizes.clone())
-                    .possible_arrangements()
-                    + Self::new("#".to_owned() + rest, self.damage_sizes.clone())
-                        .possible_arrangements()
-            }
-            _ => {}
-        }
-        if self.known.len() < 2 {
-            return PossibleArrangements::default();
-        }
-        let (firs2, rest) = self.known.split_at(2);
-        match firs2 {
-            "#." => {
-                if self.damage_sizes.first() == Some(&1) {
-                    return Self::new(".".to_owned() + rest, vec_decrement(&self.damage_sizes))
-                        .possible_arrangements()
-                        .prepend("#");
-                }
-            }
-            "##" => {
-                if let Some(n) = self.damage_sizes.first() {
-                    if n > &1 {
-                        return Self::new("#".to_owned() + rest, vec_decrement(&self.damage_sizes))
-                            .possible_arrangements()
-                            .prepend("#");
-                    }
-                }
-            }
-            "#?" => {
-                return Self::new("##".to_owned() + rest, self.damage_sizes.clone())
-                    .possible_arrangements()
-                    + Self::new("#.".to_owned() + rest, self.damage_sizes.clone())
-                        .possible_arrangements();
-            }
-            _ => {}
-        }
-        // println!("---");
-        PossibleArrangements::default()
-    }
-
-    fn new(known: String, damage_sizes: Vec<usize>) -> Self {
         Self {
             known,
             damage_sizes,
@@ -230,10 +146,6 @@ impl PossibleArrangements {
         self
     }
 
-    fn prepend(&self, prefix: &str) -> Self {
-        Self(self.0.iter().map(|s| prefix.to_owned() + s).collect())
-    }
-
     fn len(&self) -> usize {
         self.0.len()
     }
@@ -243,7 +155,11 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
         .par_iter()
-        .map(|r| possible_arrangements(r.damage_sizes.clone(), r.known.as_str()).len())
+        .map(|r| {
+            let ret = possible_arrangements(&r.damage_sizes, r.known.as_str()).len();
+            println!("{:?} = {}", &r, &ret);
+            ret
+        })
         .sum()
 }
 
@@ -254,7 +170,7 @@ mod test {
 
     #[test]
     fn all_arrangements_from_damage_sizes_simple() {
-        let damages = vec![1, 2];
+        let damages = &[1, 2];
         let arrangements = possible_arrangements(damages, "???????");
         assert_eq!(
             arrangements,
