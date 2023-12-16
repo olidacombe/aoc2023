@@ -1,0 +1,10 @@
+[package]
+name = "aoc2023-13-1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nom = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
