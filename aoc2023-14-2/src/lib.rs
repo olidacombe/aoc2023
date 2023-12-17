@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, ops::Range};
+use std::{
+    collections::{HashMap, VecDeque},
+    ops::Range,
+};
 
 enum Direction {
     North,
@@ -7,14 +10,14 @@ enum Direction {
     East,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 enum Rock {
     None,
     Rounded,
     Cube,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 struct LoadCalculator {
     cols: usize,
     rocks: Vec<Rock>,
@@ -82,7 +85,6 @@ impl LoadCalculator {
 
     fn tilt(&mut self, direction: Direction) {
         let rows = self.rocks.len() / self.cols;
-        dbg!(rows);
         let (outer, inner): (
             Range<usize>,
             Box<dyn Fn(usize) -> Box<dyn Iterator<Item = usize>>>,
@@ -108,7 +110,6 @@ impl LoadCalculator {
         for o in outer {
             let mut queue = VecDeque::new();
             for i in inner(o) {
-                dbg!(i);
                 match self.rocks[i] {
                     Rock::None => {
                         queue.push_back(i);
@@ -134,11 +135,31 @@ pub fn total_load(it: impl Iterator<Item = String>) -> usize {
     for line in it {
         load_calculator.push_row(line.as_str());
     }
-    // for _ in 0..1000000000 {
-    for _ in 0..1 {
+
+    let mut n = 1000000000;
+
+    let mut first_seen_at = HashMap::<LoadCalculator, usize>::new();
+    let mut i = 0;
+    while i < n {
         load_calculator.cycle();
+        // load_calculator.debug();
+        if let Some(first) = first_seen_at.get(&load_calculator) {
+            println!("cylce hit! {} -> {}", i, first);
+            let modulus = i - first;
+            println!("{} == {} (mod {modulus})", n - 1 - i, (n - 1 - i) % modulus);
+            n = (n - i - 1) % modulus;
+            i = 0;
+            println!("Trimming down to {i}..{n}");
+            break;
+        } else {
+            first_seen_at.insert(load_calculator.clone(), i);
+        }
+        i += 1;
     }
-    load_calculator.debug();
+    while i < n {
+        load_calculator.cycle();
+        i += 1;
+    }
     load_calculator.load()
 }
 
