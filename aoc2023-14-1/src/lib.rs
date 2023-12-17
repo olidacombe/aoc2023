@@ -1,23 +1,26 @@
-use std::iter::zip;
+use std::{iter::zip, ops::AddAssign};
 
-#[derive(Debug)]
-enum Count {
-    Rollable(usize),
-    Finished(usize),
+#[derive(Debug, Default)]
+struct Count {
+    val: usize,
+    offset: usize,
 }
 
-impl Default for Count {
-    fn default() -> Self {
-        Self::Rollable(0)
+impl AddAssign<usize> for Count {
+    fn add_assign(&mut self, rhs: usize) {
+        self.val += rhs;
     }
 }
 
 impl Count {
-    pub fn take(self) -> usize {
-        match self {
-            Count::Rollable(count) => count,
-            Count::Finished(count) => count,
-        }
+    pub fn load(&self, num_rows: usize) -> usize {
+        let n = num_rows - self.offset;
+        let c = self.val;
+        n * (n + 1) / 2 - (n - c) * (n - c + 1) / 2
+    }
+
+    pub fn new(offset: usize) -> Self {
+        Self { val: 0, offset }
     }
 }
 
@@ -39,34 +42,25 @@ impl LoadCalculator {
 
     pub fn push_row(&mut self, line: &str) {
         self.num_rows += 1;
+        let mut finished_counts = Vec::new();
         for (ch, cnt) in zip(line.chars(), self.counts.iter_mut()) {
-            if let Count::Rollable(current) = cnt {
-                match ch {
-                    '#' => {
-                        *cnt = Count::Finished(*current);
-                    }
-                    'O' => {
-                        *current += 1;
-                    }
-                    _ => {}
+            match ch {
+                '#' => {
+                    finished_counts.push(std::mem::replace(cnt, Count::new(self.num_rows)));
                 }
+                'O' => {
+                    *cnt += 1;
+                }
+                _ => {}
             }
         }
+        self.counts.append(&mut finished_counts);
     }
 
     pub fn total(self) -> usize {
         let n = self.num_rows;
         // n(n+1)/2 - (n-c)(n-c+1)/2
-        self.counts
-            .into_iter()
-            .map(|c| c.take())
-            .map(|c| {
-                let ret = n * (n + 1) / 2 - (n - c) * (n - c + 1) / 2;
-                dbg!(&ret);
-                ret
-            })
-            // .map(|c| n * (n + 1) / 2 - (n - c) * (n - c + 1) / 2)
-            .sum()
+        self.counts.into_iter().map(|c| c.load(n)).sum()
     }
 }
 
@@ -76,7 +70,6 @@ pub fn total_load(it: impl Iterator<Item = String>) -> usize {
     for line in it {
         load_calculator.push_row(line.as_str());
     }
-    dbg!(&load_calculator);
     load_calculator.total()
 }
 
