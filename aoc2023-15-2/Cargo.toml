@@ -1,0 +1,13 @@
+[package]
+name = "aoc2023-15-2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arr_macro = "0.2.1"
+color-eyre.workspace = true
+indexmap = "2.1.0"
+nom = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
