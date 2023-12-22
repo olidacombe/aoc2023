@@ -4,6 +4,7 @@ use std::{
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
 };
+use tracing::info;
 
 use nom::{
     bytes::complete::{tag, take_while1},
@@ -142,6 +143,7 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     records
         .par_iter()
         .map(|r| {
+            info!("{:?}", &r);
             let ret = possible_arrangements(&r.damage_sizes, r.known.as_str());
             println!("{:?} = {}", &r, &ret);
             ret
