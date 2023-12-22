@@ -26,7 +26,36 @@ fn validate(candidate: &str, filter: &str) -> bool {
     true
 }
 
+fn num_hashes(s: &str) -> usize {
+    s.chars().filter(|c| *c == '#').count()
+}
+
+fn num_qs(s: &str) -> usize {
+    s.chars().filter(|c| *c == '?').count()
+}
+
+// fn split_middle_dot(s: &str) -> Option<(&str, &str)> {
+//     let n = s.len() / 2;
+//     let mut i = 0;
+//     loop {
+// if let Some(c) = s
+//     }
+// }
+
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
+    // Plan:
+    //
+    // Given S, D = (n_1, ..., n_k)
+    //
+    // 1. Split at "middle-most" '.' char S -> (L, R)
+    //  1. Sum f(L, p) * f(R, q) for all partitions p|q of D
+    // 1. When no '.' found:
+    //  1. If count(?) < k-1 return 0
+    //  1. If count(#) > sum(D) return 0
+    //  1. Else go brute as below
+    //
+    //  Maybe a cache too...?
+
     let length = filter.len();
     let k = damage_sizes.len();
     if k == 0 {
