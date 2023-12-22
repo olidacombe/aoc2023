@@ -1,17 +1,26 @@
-use std::{fmt, ops::Add};
+use std::{
+    collections::HashSet,
+    fmt,
+    ops::{Add, RangeBounds},
+};
 
 struct Network {
     start: (usize, usize),
     pipes: Vec<Vec<char>>,
     interiousity: Vec<Vec<i32>>,
+    path: HashSet<(usize, usize)>,
 }
 
 impl fmt::Display for Network {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ret = String::default();
-        for row in self.interiousity.iter() {
-            for col in row {
-                ret.push_str(&col.to_string());
+        for (i, row) in self.interiousity.iter().enumerate() {
+            for (j, col) in row.iter().enumerate() {
+                if self.path.contains(&(i, j)) || *col == 0 {
+                    ret.push_str("0");
+                } else {
+                    ret.push_str("1");
+                }
             }
             ret.push('\n');
         }
@@ -24,10 +33,12 @@ impl Network {
         let mut pipes = Vec::new();
         let mut interiousity = Vec::new();
         let mut start = None;
+        let mut path = HashSet::new();
         for (row, line) in it.enumerate() {
             let chars: Vec<char> = line.chars().collect();
             if let Some(col) = chars.iter().position(|c| *c == 'S') {
                 start = Some((row, col));
+                path.insert((row, col));
             }
             interiousity.push(vec![0; chars.len()]);
             pipes.push(chars);
@@ -36,6 +47,7 @@ impl Network {
             interiousity,
             pipes,
             start: start.unwrap(),
+            path,
         }
     }
 
@@ -89,61 +101,8 @@ impl Network {
         for i in 0..walker.col {
             self.interiousity[walker.row][i] -= multiplier;
         }
-        for i in (walker.col + 1)..self.interiousity[0].len() {
+        for i in walker.col..self.interiousity[0].len() {
             self.interiousity[walker.row][i] += multiplier;
-        }
-    }
-
-    fn tip_start(&mut self, walker: &NetWalker, came_from: Direction) {
-        let matchers: [(Direction, (i32, i32)); 4] = [
-            (Direction::Left, (0, -1)),
-            (Direction::Down, (1, 0)),
-            (Direction::Right, (0, 1)),
-            (Direction::Up, (-1, 0)),
-        ];
-        let mut other_dir = None;
-        for (dir, (row, col)) in matchers {
-            if dir == came_from {
-                continue;
-            }
-            if row == -1 && walker.row == 0 {
-                continue;
-            }
-            if col == -1 && walker.col == 0 {
-                continue;
-            }
-            if self.get(
-                (walker.row as i32 + row) as usize,
-                (walker.col as i32 + col) as usize,
-            ) != Some(&'.')
-            {
-                other_dir = Some(dir);
-                break;
-            }
-        }
-        let other_dir = other_dir.unwrap();
-        match came_from {
-            Direction::Left => match other_dir {
-                Direction::Down => self.tip_row(&walker, -1),
-                Direction::Up => self.tip_row(&walker, 1),
-                _ => {}
-            },
-            Direction::Down => {
-                self.tip_row(&walker, 1);
-                match other_dir {
-                    Direction::Up => self.tip_row(&(walker + (0, -1)), 1),
-                    _ => {}
-                }
-            }
-            Direction::Right => match other_dir {
-                Direction::Down => self.tip_row(&walker, 1),
-                Direction::Up => self.tip_row(&walker, -1),
-                _ => {}
-            },
-            Direction::Up => match other_dir {
-                Direction::Down => self.tip_row(&(walker + (1, 0)), -1),
-                _ => {}
-            },
         }
     }
 
@@ -157,8 +116,8 @@ impl Network {
                     walker.col += 1;
                 }
                 'J' => {
-                    walker.row -= 1;
                     self.tip_row(&walker, 1);
+                    walker.row -= 1;
                     walker.came_from = Direction::Down;
                 }
                 '7' => {
@@ -170,13 +129,13 @@ impl Network {
                     return true;
                 }
                 _ => {
-                    dbg!(walker);
+                    dbg!(&walker);
                 }
             },
             Direction::Down => match pipe {
                 '|' => {
-                    walker.row -= 1;
                     self.tip_row(&walker, 1);
+                    walker.row -= 1;
                 }
                 'F' => {
                     walker.col += 1;
@@ -190,7 +149,7 @@ impl Network {
                     return true;
                 }
                 _ => {
-                    dbg!(walker);
+                    dbg!(&walker);
                 }
             },
             Direction::Right => match pipe {
@@ -198,8 +157,8 @@ impl Network {
                     walker.col -= 1;
                 }
                 'L' => {
-                    walker.row -= 1;
                     self.tip_row(&walker, 1);
+                    walker.row -= 1;
                     walker.came_from = Direction::Down;
                 }
                 'F' => {
@@ -211,7 +170,7 @@ impl Network {
                     return true;
                 }
                 _ => {
-                    dbg!(walker);
+                    dbg!(&walker);
                 }
             },
             Direction::Up => match pipe {
@@ -232,28 +191,24 @@ impl Network {
                     return true;
                 }
                 _ => {
-                    dbg!(walker);
+                    dbg!(&walker);
                 }
             },
         }
+        self.path.insert(walker.coords());
         false
     }
 
-    pub fn normalize(&mut self) {
-        for row in self.interiousity.iter_mut() {
-            for col in row {
-                if *col != 0 {
-                    *col = 1;
+    pub fn sum(&self) -> usize {
+        let mut count = 0;
+        for (i, row) in self.interiousity.iter().enumerate() {
+            for (j, col) in row.iter().enumerate() {
+                if !self.path.contains(&(i, j)) && *col != 0 {
+                    count += 1;
                 }
             }
         }
-    }
-
-    pub fn sum(&self) -> i32 {
-        self.interiousity
-            .iter()
-            .map(|row| row.iter().sum::<i32>())
-            .sum()
+        count
     }
 }
 
@@ -284,16 +239,21 @@ impl Add<(i32, i32)> for &NetWalker {
     }
 }
 
-pub fn num_enclosed_tiles(it: impl Iterator<Item = String>) -> u64 {
+impl NetWalker {
+    pub fn coords(&self) -> (usize, usize) {
+        (self.row, self.col)
+    }
+}
+
+pub fn num_enclosed_tiles(it: impl Iterator<Item = String>) -> usize {
     let mut network = Network::from(it);
     let mut walkers = network.walkers();
     let mut walker = walkers.first_mut().unwrap();
     while !network.next(&mut walker) {}
-    network.normalize();
     dbg!(walker.age);
     dbg!(network.sum());
     println!("{network}");
-    u64::default()
+    network.sum()
 }
 
 #[cfg(test)]
