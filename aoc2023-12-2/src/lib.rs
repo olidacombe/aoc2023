@@ -1,8 +1,12 @@
 use itertools::Itertools;
+use num_integer::binomial;
 use rayon::prelude::*;
 use std::{
+    cell::OnceCell,
+    collections::HashMap,
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
+    sync::{Mutex, OnceLock},
 };
 use tracing::{debug, info, trace};
 
@@ -26,25 +30,38 @@ fn validate(candidate: &str, filter: &str) -> bool {
     true
 }
 
-fn num_hashes(s: &str) -> (usize, usize) {
+fn num_hashes(s: &str) -> (usize, usize, usize, usize) {
     let mut num = 0;
     let mut max_counter = 0;
     let mut max = 0;
-    for c in s.chars() {
+    let mut end = 0;
+    let mut start_tracker = 0;
+    let mut start = 0;
+    for (i, c) in s.chars().enumerate() {
         match c {
             '#' => {
+                if max_counter == 0 {
+                    start_tracker = i;
+                }
                 num += 1;
                 max_counter += 1;
                 if max_counter > max {
+                    start = start_tracker;
                     max = max_counter;
                 }
             }
             _ => {
-                max_counter = 0;
+                if max_counter > 0 {
+                    end = i;
+                    max_counter = 0;
+                }
             }
         }
     }
-    (num, max)
+    if end < start {
+        end = s.len();
+    }
+    (num, max, start, end)
 }
 
 fn num_qs(s: &str) -> usize {
@@ -68,6 +85,14 @@ fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
         }
     }
     None
+}
+
+fn n_choose_k(n: usize, k: usize) -> usize {
+    trace!("{n} choose {k}");
+    if k == 0 || k == n {
+        return 1;
+    }
+    n_choose_k(n - 1, k - 1) + n_choose_k(n - 1, k)
 }
 
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
@@ -97,23 +122,30 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     }
 
     // No '.' found
+    let num_qs = num_qs(filter);
+    if num_qs == 0 {
+        return 1;
+    }
     let k = damage_sizes.len();
-    let (num_hashes, max_hashes) = num_hashes(filter);
+    let (num_hashes, max_hashes, max_hash_start, max_hash_end) = num_hashes(filter);
     let total_damage = damage_sizes.iter().sum();
+
     let max_damage = damage_sizes.iter().max().unwrap_or(&0);
 
     if max_hashes > *max_damage {
         return 0;
     }
-    debug!("{max_hashes} <= {max_damage} : {filter}");
 
     if total_damage == 0 && num_hashes == 0 {
+        return 1;
+    }
+    if num_hashes == total_damage {
         return 1;
     }
     if num_hashes > total_damage {
         return 0;
     }
-    if num_qs(filter) < k - 1 {
+    if num_qs < k - 1 {
         return 0;
     }
 
@@ -123,42 +155,59 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         return 0;
     }
 
-    // TODO if num_hashes == 0, (k+D D) "k+D choose D"
-
-    if let Some(i) = filter.find("?#") {
-        let (l, r) = filter.split_at(i);
-        let (_, r) = r.split_at(2);
-        let option_1 = l.to_string() + ".#" + r;
-        let option_2 = l.to_string() + "##" + r;
-        return possible_arrangements(damage_sizes, option_1.as_str())
-            + possible_arrangements(damage_sizes, option_2.as_str());
+    // We are long enough and all '?'
+    if num_hashes == 0 {
+        return binomial(k + total_damage, total_damage);
     }
+
+    if max_hash_end < length {
+        let (left, right) = filter.split_at(max_hash_end);
+        let end = right.split_at(1).1;
+        debug!("Splitting {filter} -> {left}[?]{end}");
+        return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
+            + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
+    } else {
+        let (left, right) = filter.split_at(max_hash_start - 1);
+        let end = right.split_at(1).1;
+        debug!("Splitting {filter} -> {left}[?]{end}");
+        return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
+            + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
+    }
+
+    // if let Some(i) = filter.find("?#") {
+    //     let (l, r) = filter.split_at(i);
+    //     let (_, r) = r.split_at(2);
+    //     let option_1 = l.to_string() + ".#" + r;
+    //     let option_2 = l.to_string() + "##" + r;
+    //     return possible_arrangements(damage_sizes, option_1.as_str())
+    //         + possible_arrangements(damage_sizes, option_2.as_str());
+    // }
 
     // Brute force
-    let free_dots = length - mandatory_size;
-
-    let (n, damage_sizes) = damage_sizes.split_last().unwrap();
-
-    let mut arrangements = 0;
-
-    let mut midfix = str::repeat("#", *n);
-    if !damage_sizes.is_empty() {
-        midfix = format!(".{}", midfix);
-    }
-
-    for suffix_dots in 0..free_dots + 1 {
-        let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
-        let suffix_len = suffix.len();
-        let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
-
-        if !validate(suffix.as_str(), suffix_filter) {
-            continue;
-        }
-
-        arrangements += possible_arrangements(damage_sizes, prefix_filter);
-    }
-
-    arrangements.into()
+    // let free_dots = length - mandatory_size;
+    //
+    // let (n, damage_sizes) = damage_sizes.split_last().unwrap();
+    //
+    // let mut arrangements = 0;
+    //
+    // let mut midfix = str::repeat("#", *n);
+    // if !damage_sizes.is_empty() {
+    //     midfix = format!(".{}", midfix);
+    // }
+    //
+    // for suffix_dots in 0..free_dots + 1 {
+    //     let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
+    //     let suffix_len = suffix.len();
+    //     let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
+    //
+    //     if !validate(suffix.as_str(), suffix_filter) {
+    //         continue;
+    //     }
+    //
+    //     arrangements += possible_arrangements(damage_sizes, prefix_filter);
+    // }
+    //
+    // arrangements.into()
 }
 
 #[derive(Debug)]
@@ -270,6 +319,12 @@ mod test {
             sum_possible_arrangements(example.lines().map(String::from)),
             525152
         );
+    }
+
+    #[test]
+    fn num_hashes_basic() {
+        assert_eq!(num_hashes("#??###??#"), (5, 3, 3, 6));
+        assert_eq!(num_hashes("#?????##"), (3, 2, 6, 8));
     }
 
     #[test]
