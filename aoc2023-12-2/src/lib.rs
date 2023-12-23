@@ -34,13 +34,22 @@ fn num_qs(s: &str) -> usize {
     s.chars().filter(|c| *c == '?').count()
 }
 
-// fn split_middle_dot(s: &str) -> Option<(&str, &str)> {
-//     let n = s.len() / 2;
-//     let mut i = 0;
-//     loop {
-// if let Some(c) = s
-//     }
-// }
+fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
+    let n = s.len() / 2;
+    let mut i = 0;
+    while i <= n {
+        let (l, r) = s.split_at(n - i);
+        if r.starts_with(".") {
+            return Some((l, r.split_at(1).1));
+        }
+        i += 1;
+        let (l, r) = s.split_at(n + i);
+        if r.starts_with(".") {
+            return Some((l, r.split_at(1).1));
+        }
+    }
+    None
+}
 
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     // Plan:
@@ -199,5 +208,16 @@ mod test {
             sum_possible_arrangements(example.lines().map(String::from)),
             525152
         );
+    }
+
+    #[test]
+    fn middle_dot_odd_even_lengths() {
+        assert_eq!(split_at_middle_dot(".abc"), Some(("", "abc")));
+        assert_eq!(split_at_middle_dot("abc."), Some(("abc", "")));
+        assert_eq!(split_at_middle_dot(".abcd"), Some(("", "abcd")));
+        assert_eq!(split_at_middle_dot("abcd."), Some(("abcd", "")));
+        assert_eq!(split_at_middle_dot("ab.cd"), Some(("ab", "cd")));
+        assert_eq!(split_at_middle_dot("abc.de"), Some(("abc", "de")));
+        assert_eq!(split_at_middle_dot("ab.cde"), Some(("ab", "cde")));
     }
 }
