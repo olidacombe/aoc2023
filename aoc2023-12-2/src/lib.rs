@@ -4,7 +4,7 @@ use std::{
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
 };
-use tracing::info;
+use tracing::{debug, info, trace};
 
 use nom::{
     bytes::complete::{tag, take_while1},
@@ -26,8 +26,25 @@ fn validate(candidate: &str, filter: &str) -> bool {
     true
 }
 
-fn num_hashes(s: &str) -> usize {
-    s.chars().filter(|c| *c == '#').count()
+fn num_hashes(s: &str) -> (usize, usize) {
+    let mut num = 0;
+    let mut max_counter = 0;
+    let mut max = 0;
+    for c in s.chars() {
+        match c {
+            '#' => {
+                num += 1;
+                max_counter += 1;
+                if max_counter > max {
+                    max = max_counter;
+                }
+            }
+            _ => {
+                max_counter = 0;
+            }
+        }
+    }
+    (num, max)
 }
 
 fn num_qs(s: &str) -> usize {
@@ -54,6 +71,7 @@ fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
 }
 
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
+    trace!(filter);
     // Plan:
     //
     // Given S, D = (n_1, ..., n_k)
@@ -80,8 +98,14 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
 
     // No '.' found
     let k = damage_sizes.len();
-    let num_hashes = num_hashes(filter);
+    let (num_hashes, max_hashes) = num_hashes(filter);
     let total_damage = damage_sizes.iter().sum();
+    let max_damage = damage_sizes.iter().max().unwrap_or(&0);
+
+    if max_hashes > *max_damage {
+        return 0;
+    }
+    debug!("{max_hashes} <= {max_damage} : {filter}");
 
     if total_damage == 0 && num_hashes == 0 {
         return 1;
@@ -98,6 +122,19 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     if mandatory_size > length {
         return 0;
     }
+
+    // TODO if num_hashes == 0, (k+D D) "k+D choose D"
+
+    if let Some(i) = filter.find("?#") {
+        let (l, r) = filter.split_at(i);
+        let (_, r) = r.split_at(2);
+        let option_1 = l.to_string() + ".#" + r;
+        let option_2 = l.to_string() + "##" + r;
+        return possible_arrangements(damage_sizes, option_1.as_str())
+            + possible_arrangements(damage_sizes, option_2.as_str());
+    }
+
+    // Brute force
     let free_dots = length - mandatory_size;
 
     let (n, damage_sizes) = damage_sizes.split_last().unwrap();
@@ -202,9 +239,11 @@ impl AddAssign for PossibleArrangements {
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
-        .par_iter()
-        .map(|r| {
-            info!("{:?}", &r);
+        // .par_iter()
+        .iter()
+        .enumerate()
+        .map(|(i, r)| {
+            info!("{i}: {:?}", &r);
             let ret = possible_arrangements(&r.damage_sizes, r.known.as_str());
             println!("{:?} = {}", &r, &ret);
             ret
