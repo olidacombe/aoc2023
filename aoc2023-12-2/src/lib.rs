@@ -67,15 +67,37 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     //
     //  Maybe a cache too...?
 
-    let length = filter.len();
-    let k = damage_sizes.len();
-    if k == 0 {
-        if validate(&str::repeat(".", length), filter) {
-            return 1;
+    // Divide on "middlemost" '.'
+    if let Some((filter_left, filter_right)) = split_at_middle_dot(filter) {
+        let mut arrangements = 0;
+        for i in 0..damage_sizes.len() + 1 {
+            let (damage_left, damage_right) = damage_sizes.split_at(i);
+            arrangements += possible_arrangements(damage_left, filter_left)
+                * possible_arrangements(damage_right, filter_right);
         }
+        return arrangements;
+    }
+
+    // No '.' found
+    let k = damage_sizes.len();
+    let num_hashes = num_hashes(filter);
+    let total_damage = damage_sizes.iter().sum();
+
+    if total_damage == 0 && num_hashes == 0 {
+        return 1;
+    }
+    if num_hashes > total_damage {
         return 0;
     }
-    let mandatory_size = damage_sizes.iter().sum::<usize>() + k - 1; // all the # groups plus a .
+    if num_qs(filter) < k - 1 {
+        return 0;
+    }
+
+    let length = filter.len();
+    let mandatory_size = total_damage + k - 1; // all the # groups plus a .
+    if mandatory_size > length {
+        return 0;
+    }
     let free_dots = length - mandatory_size;
 
     let (n, damage_sizes) = damage_sizes.split_last().unwrap();
@@ -163,7 +185,6 @@ impl From<Vec<&str>> for PossibleArrangements {
     }
 }
 
-// TODO replate .append with + :D
 impl Add<&str> for PossibleArrangements {
     type Output = Self;
 
