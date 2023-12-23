@@ -36,14 +36,16 @@ fn num_qs(s: &str) -> usize {
 
 fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
     let n = s.len() / 2;
-    let mut i = 0;
-    while i <= n {
-        let (l, r) = s.split_at(n - i);
+    let (l, r) = s.split_at(n);
+    if r.starts_with(".") {
+        return Some((l, r.split_at(1).1));
+    }
+    for i in 1..n + 1 {
+        let (l, r) = s.split_at(n + i);
         if r.starts_with(".") {
             return Some((l, r.split_at(1).1));
         }
-        i += 1;
-        let (l, r) = s.split_at(n + i);
+        let (l, r) = s.split_at(n - i);
         if r.starts_with(".") {
             return Some((l, r.split_at(1).1));
         }
@@ -219,5 +221,7 @@ mod test {
         assert_eq!(split_at_middle_dot("ab.cd"), Some(("ab", "cd")));
         assert_eq!(split_at_middle_dot("abc.de"), Some(("abc", "de")));
         assert_eq!(split_at_middle_dot("ab.cde"), Some(("ab", "cde")));
+        assert_eq!(split_at_middle_dot("abc"), None);
+        assert_eq!(split_at_middle_dot("abcd"), None);
     }
 }
