@@ -174,6 +174,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     // So if we're not working with the right number of ?s we are done
     let num_qs = num_qs(filter);
     if num_qs == 0 {
+        // If we had a correct match, we would have returned above
         return 0;
     }
     if num_qs < k - 1 {
@@ -182,9 +183,20 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
 
     let free_dots = length - mandatory_size;
 
-    // // We are long enough and all '?'
+    // We are long enough and all '?'
     if num_hashes == 0 {
         return binomial(k + free_dots, free_dots);
+    }
+
+    // Divide on "middlemost" '?'
+    if let Some((filter_left, filter_right)) = split_at_middle_match::<'?'>(filter) {
+        return possible_arrangements(
+            damage_sizes,
+            (filter_left.to_string() + "." + filter_right).as_str(),
+        ) + possible_arrangements(
+            damage_sizes,
+            (filter_left.to_string() + "#" + filter_right).as_str(),
+        );
     }
 
     // if max_hash_end < length {
