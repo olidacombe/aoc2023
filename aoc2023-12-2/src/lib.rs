@@ -26,7 +26,7 @@ fn validate_old(candidate: &str, filter: &str) -> bool {
     true
 }
 
-fn validate_damage_sizes(damage_sizes: Vec<usize>, candidates: Vec<usize>) -> bool {
+fn validate_damage_sizes(damage_sizes: &[usize], candidates: &[usize]) -> bool {
     if candidates.iter().sum::<usize>() > damage_sizes.iter().sum() {
         return false;
     }
@@ -153,6 +153,10 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     if filter_damage_sizes == damage_sizes {
         // we have found an exact match, if we make all ?s into .s
         return 1;
+    }
+
+    if !validate_damage_sizes(damage_sizes, &filter_damage_sizes) {
+        return 0;
     }
 
     // No '.' found
