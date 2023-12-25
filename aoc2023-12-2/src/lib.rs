@@ -14,7 +14,7 @@ use nom::{
     IResult,
 };
 
-fn validate(candidate: &str, filter: &str) -> bool {
+fn validate_old(candidate: &str, filter: &str) -> bool {
     for (c, v) in zip(candidate.chars(), filter.chars()) {
         if v == '?' {
             continue;
@@ -24,6 +24,45 @@ fn validate(candidate: &str, filter: &str) -> bool {
         }
     }
     true
+}
+
+fn validate_damage_sizes(damage_sizes: Vec<usize>, candidates: Vec<usize>) -> bool {
+    if candidates.iter().sum::<usize>() > damage_sizes.iter().sum() {
+        return false;
+    }
+
+    for (candi, damage) in zip(
+        candidates.iter().sorted().rev(),
+        damage_sizes.iter().sorted().rev(),
+    ) {
+        if candi > damage {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn hash_sizes(s: &str) -> Vec<usize> {
+    let mut hash_size = 0;
+    let mut hash_sizes = Vec::new();
+
+    for c in s.chars() {
+        match c {
+            '#' => {
+                hash_size += 1;
+            }
+            _ => {
+                hash_sizes.push(hash_size);
+                hash_size = 0;
+            }
+        }
+    }
+    if hash_size > 0 {
+        hash_sizes.push(hash_size);
+    }
+
+    hash_sizes
 }
 
 fn num_hashes(s: &str) -> (usize, usize, usize, usize) {
@@ -83,14 +122,6 @@ fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn n_choose_k(n: usize, k: usize) -> usize {
-    trace!("{n} choose {k}");
-    if k == 0 || k == n {
-        return 1;
-    }
-    n_choose_k(n - 1, k - 1) + n_choose_k(n - 1, k)
-}
-
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     trace!(filter);
     // Plan:
@@ -117,14 +148,22 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         return arrangements;
     }
 
+    // Get damage sizes as found in the filter
+    let filter_damage_sizes = hash_sizes(filter);
+    if filter_damage_sizes == damage_sizes {
+        // we have found an exact match, if we make all ?s into .s
+        return 1;
+    }
+
     // No '.' found
     let num_qs = num_qs(filter);
     if num_qs == 0 {
-        return 1;
+        return 0;
     }
+
     let k = damage_sizes.len();
     let (num_hashes, max_hashes, max_hash_start, max_hash_end) = num_hashes(filter);
-    let total_damage = damage_sizes.iter().sum();
+    let total_damage = damage_sizes.iter().sum::<usize>();
 
     let max_damage = damage_sizes.iter().max().unwrap_or(&0);
 
@@ -152,7 +191,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     }
     let free_dots = length - mandatory_size;
 
-    // We are long enough and all '?'
+    // // We are long enough and all '?'
     if num_hashes == 0 {
         return binomial(k + free_dots, free_dots);
     }
@@ -203,7 +242,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         let suffix_len = suffix.len();
         let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
 
-        if !validate(suffix.as_str(), suffix_filter) {
+        if !validate_old(suffix.as_str(), suffix_filter) {
             continue;
         }
 
