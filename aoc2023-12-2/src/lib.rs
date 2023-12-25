@@ -4,7 +4,7 @@ use std::{
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
 };
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 use nom::{
     bytes::complete::{tag, take_while1},
@@ -14,20 +14,9 @@ use nom::{
     IResult,
 };
 
-fn validate_old(candidate: &str, filter: &str) -> bool {
-    for (c, v) in zip(candidate.chars(), filter.chars()) {
-        if v == '?' {
-            continue;
-        }
-        if c != v {
-            return false;
-        }
-    }
-    true
-}
-
 fn validate_damage_sizes(damage_sizes: &[usize], candidates: &[usize]) -> bool {
     if candidates.iter().sum::<usize>() > damage_sizes.iter().sum() {
+        trace!("{candidates:?} > {damage_sizes:?} => fail");
         return false;
     }
 
@@ -36,6 +25,7 @@ fn validate_damage_sizes(damage_sizes: &[usize], candidates: &[usize]) -> bool {
         damage_sizes.iter().sorted().rev(),
     ) {
         if candi > damage {
+            trace!("{candidates:?} > {damage_sizes:?} => fail");
             return false;
         }
     }
@@ -65,40 +55,6 @@ fn hash_sizes(s: &str) -> Vec<usize> {
     }
 
     hash_sizes
-}
-
-fn num_hashes(s: &str) -> (usize, usize, usize, usize) {
-    let mut num = 0;
-    let mut max_counter = 0;
-    let mut max = 0;
-    let mut end = 0;
-    let mut start_tracker = 0;
-    let mut start = 0;
-    for (i, c) in s.chars().enumerate() {
-        match c {
-            '#' => {
-                if max_counter == 0 {
-                    start_tracker = i;
-                }
-                num += 1;
-                max_counter += 1;
-                if max_counter > max {
-                    start = start_tracker;
-                    max = max_counter;
-                }
-            }
-            _ => {
-                if max_counter > 0 {
-                    end = i;
-                    max_counter = 0;
-                }
-            }
-        }
-    }
-    if end < start {
-        end = s.len();
-    }
-    (num, max, start, end)
 }
 
 fn num_qs(s: &str) -> usize {
@@ -142,11 +98,13 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     // Get damage sizes as found in the filter
     let filter_damage_sizes = hash_sizes(filter);
     if filter_damage_sizes == damage_sizes {
+        trace!("{filter} : {filter_damage_sizes:?} = {damage_sizes:?} => 1");
         // we have found an exact match, if we make all ?s into .s
         return 1;
     }
 
     if !validate_damage_sizes(damage_sizes, &filter_damage_sizes) {
+        trace!("{filter} : {filter_damage_sizes:?} X {damage_sizes:?} => 0");
         return 0;
     }
 
@@ -156,6 +114,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     let length = filter.len();
     let mandatory_size = total_damage + k - 1; // all the # groups plus a . between
     if mandatory_size > length {
+        trace!("{filter} {damage_sizes:?} mandatory {mandatory_size} > {length} => 0");
         return 0;
     }
 
@@ -173,11 +132,8 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     // No '.' found
     // So if we're not working with the right number of ?s we are done
     let num_qs = num_qs(filter);
-    if num_qs == 0 {
-        // If we had a correct match, we would have returned above
-        return 0;
-    }
     if num_qs < k - 1 {
+        trace!("{filter} insufficient qs for {damage_sizes:?}");
         return 0;
     }
 
@@ -185,7 +141,9 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
 
     // We are long enough and all '?'
     if num_hashes == 0 {
-        return binomial(k + free_dots, free_dots);
+        let combinatorial_arrangements = binomial(k + free_dots, free_dots);
+        trace!("{filter} * {damage_sizes:?} => {combinatorial_arrangements}");
+        return combinatorial_arrangements;
     }
 
     // Divide on "middlemost" '?'
@@ -199,60 +157,7 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         );
     }
 
-    // if max_hash_end < length {
-    //     let (left, right) = filter.split_at(max_hash_end);
-    //     let end = right.split_at(1).1;
-    //     debug!("Splitting {filter} -> {left}[?]{end}");
-    //     return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
-    //         + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
-    // } else {
-    //     let (left, right) = filter.split_at(max_hash_start - 1);
-    //     let end = right.split_at(1).1;
-    //     debug!("Splitting {filter} -> {left}[?]{end}");
-    //     return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
-    //         + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
-    // }
-
-    // if let Some(i) = filter.find("?#") {
-    //     let (l, r) = filter.split_at(i);
-    //     let (_, r) = r.split_at(2);
-    //     let option_1 = l.to_string() + ".#" + r;
-    //     let option_2 = l.to_string() + "##" + r;
-    //     return possible_arrangements(damage_sizes, option_1.as_str())
-    //         + possible_arrangements(damage_sizes, option_2.as_str());
-    // } else if let Some(i) = filter.find("#?") {
-    //     let (l, r) = filter.split_at(i);
-    //     let (_, r) = r.split_at(2);
-    //     let option_1 = l.to_string() + "#." + r;
-    //     let option_2 = l.to_string() + "##" + r;
-    //     return possible_arrangements(damage_sizes, option_1.as_str())
-    //         + possible_arrangements(damage_sizes, option_2.as_str());
-    // }
-
-    // Brute force
-
-    let (n, damage_sizes) = damage_sizes.split_last().unwrap();
-
-    let mut arrangements = 0;
-
-    let mut midfix = str::repeat("#", *n);
-    if !damage_sizes.is_empty() {
-        midfix = format!(".{}", midfix);
-    }
-
-    for suffix_dots in 0..free_dots + 1 {
-        let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
-        let suffix_len = suffix.len();
-        let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
-
-        if !validate_old(suffix.as_str(), suffix_filter) {
-            continue;
-        }
-
-        arrangements += possible_arrangements(damage_sizes, prefix_filter);
-    }
-
-    arrangements.into()
+    unreachable!("How did we get here?");
 }
 
 #[derive(Debug)]
@@ -413,6 +318,18 @@ mod test {
     }
 
     #[test]
+    fn example_line_12() {
+        let example = indoc! {"
+            ?.###??????#???.?.?? 11,1
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            // 4 // 1 round
+            5184
+        );
+    }
+
+    #[test]
     fn full_example() {
         let example = indoc! {"
             ???.### 1,1,3
@@ -426,12 +343,6 @@ mod test {
             sum_possible_arrangements(example.lines().map(String::from)),
             525152
         );
-    }
-
-    #[test]
-    fn num_hashes_basic() {
-        assert_eq!(num_hashes("#??###??#"), (5, 3, 3, 6));
-        assert_eq!(num_hashes("#?????##"), (3, 2, 6, 8));
     }
 
     #[test]
