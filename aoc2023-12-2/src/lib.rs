@@ -105,19 +105,19 @@ fn num_qs(s: &str) -> usize {
     s.chars().filter(|c| *c == '?').count()
 }
 
-fn split_at_middle_dot(s: &str) -> Option<(&str, &str)> {
+fn split_at_middle_match<const C: char>(s: &str) -> Option<(&str, &str)> {
     let n = s.len() / 2;
     let (l, r) = s.split_at(n);
-    if r.starts_with(".") {
+    if r.starts_with(C) {
         return Some((l, r.split_at(1).1));
     }
     for i in 1..n + 1 {
         let (l, r) = s.split_at(n + i);
-        if r.starts_with(".") {
+        if r.starts_with(C) {
             return Some((l, r.split_at(1).1));
         }
         let (l, r) = s.split_at(n - i);
-        if r.starts_with(".") {
+        if r.starts_with(C) {
             return Some((l, r.split_at(1).1));
         }
     }
@@ -139,17 +139,6 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     //
     //  Maybe a cache too...?
 
-    // Divide on "middlemost" '.'
-    if let Some((filter_left, filter_right)) = split_at_middle_dot(filter) {
-        let mut arrangements = 0;
-        for i in 0..damage_sizes.len() + 1 {
-            let (damage_left, damage_right) = damage_sizes.split_at(i);
-            arrangements += possible_arrangements(damage_left, filter_left)
-                * possible_arrangements(damage_right, filter_right);
-        }
-        return arrangements;
-    }
-
     // Get damage sizes as found in the filter
     let filter_damage_sizes = hash_sizes(filter);
     if filter_damage_sizes == damage_sizes {
@@ -164,6 +153,22 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     let k = damage_sizes.len();
     let num_hashes = filter_damage_sizes.iter().sum::<usize>();
     let total_damage = damage_sizes.iter().sum::<usize>();
+    let length = filter.len();
+    let mandatory_size = total_damage + k - 1; // all the # groups plus a . between
+    if mandatory_size > length {
+        return 0;
+    }
+
+    // Divide on "middlemost" '.'
+    if let Some((filter_left, filter_right)) = split_at_middle_match::<'.'>(filter) {
+        let mut arrangements = 0;
+        for i in 0..damage_sizes.len() + 1 {
+            let (damage_left, damage_right) = damage_sizes.split_at(i);
+            arrangements += possible_arrangements(damage_left, filter_left)
+                * possible_arrangements(damage_right, filter_right);
+        }
+        return arrangements;
+    }
 
     // No '.' found
     // So if we're not working with the right number of ?s we are done
@@ -175,11 +180,6 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         return 0;
     }
 
-    let length = filter.len();
-    let mandatory_size = total_damage + k - 1; // all the # groups plus a . between
-    if mandatory_size > length {
-        return 0;
-    }
     let free_dots = length - mandatory_size;
 
     // // We are long enough and all '?'
@@ -424,14 +424,14 @@ mod test {
 
     #[test]
     fn middle_dot_odd_even_lengths() {
-        assert_eq!(split_at_middle_dot(".abc"), Some(("", "abc")));
-        assert_eq!(split_at_middle_dot("abc."), Some(("abc", "")));
-        assert_eq!(split_at_middle_dot(".abcd"), Some(("", "abcd")));
-        assert_eq!(split_at_middle_dot("abcd."), Some(("abcd", "")));
-        assert_eq!(split_at_middle_dot("ab.cd"), Some(("ab", "cd")));
-        assert_eq!(split_at_middle_dot("abc.de"), Some(("abc", "de")));
-        assert_eq!(split_at_middle_dot("ab.cde"), Some(("ab", "cde")));
-        assert_eq!(split_at_middle_dot("abc"), None);
-        assert_eq!(split_at_middle_dot("abcd"), None);
+        assert_eq!(split_at_middle_match::<'.'>(".abc"), Some(("", "abc")));
+        assert_eq!(split_at_middle_match::<'.'>("abc."), Some(("abc", "")));
+        assert_eq!(split_at_middle_match::<'.'>(".abcd"), Some(("", "abcd")));
+        assert_eq!(split_at_middle_match::<'.'>("abcd."), Some(("abcd", "")));
+        assert_eq!(split_at_middle_match::<'.'>("ab.cd"), Some(("ab", "cd")));
+        assert_eq!(split_at_middle_match::<'.'>("abc.de"), Some(("abc", "de")));
+        assert_eq!(split_at_middle_match::<'.'>("ab.cde"), Some(("ab", "cde")));
+        assert_eq!(split_at_middle_match::<'.'>("abc"), None);
+        assert_eq!(split_at_middle_match::<'.'>("abcd"), None);
     }
 }
