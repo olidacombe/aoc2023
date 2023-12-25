@@ -53,7 +53,9 @@ fn hash_sizes(s: &str) -> Vec<usize> {
                 hash_size += 1;
             }
             _ => {
-                hash_sizes.push(hash_size);
+                if hash_size > 0 {
+                    hash_sizes.push(hash_size);
+                }
                 hash_size = 0;
             }
         }
@@ -159,29 +161,14 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
         return 0;
     }
 
-    // No '.' found
-    let num_qs = num_qs(filter);
-    if num_qs == 0 {
-        return 0;
-    }
-
     let k = damage_sizes.len();
-    let (num_hashes, max_hashes, max_hash_start, max_hash_end) = num_hashes(filter);
+    let num_hashes = filter_damage_sizes.iter().sum::<usize>();
     let total_damage = damage_sizes.iter().sum::<usize>();
 
-    let max_damage = damage_sizes.iter().max().unwrap_or(&0);
-
-    if max_hashes > *max_damage {
-        return 0;
-    }
-
-    if total_damage == 0 && num_hashes == 0 {
-        return 1;
-    }
-    if num_hashes == total_damage {
-        return 1;
-    }
-    if num_hashes > total_damage {
+    // No '.' found
+    // So if we're not working with the right number of ?s we are done
+    let num_qs = num_qs(filter);
+    if num_qs == 0 {
         return 0;
     }
     if num_qs < k - 1 {
