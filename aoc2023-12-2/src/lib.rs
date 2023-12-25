@@ -1,12 +1,8 @@
 use itertools::Itertools;
 use num_integer::binomial;
-use rayon::prelude::*;
 use std::{
-    cell::OnceCell,
-    collections::HashMap,
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
-    sync::{Mutex, OnceLock},
 };
 use tracing::{debug, info, trace};
 
@@ -150,29 +146,30 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     }
 
     let length = filter.len();
-    let mandatory_size = total_damage + k - 1; // all the # groups plus a .
+    let mandatory_size = total_damage + k - 1; // all the # groups plus a . between
     if mandatory_size > length {
         return 0;
     }
+    let free_dots = length - mandatory_size;
 
     // We are long enough and all '?'
     if num_hashes == 0 {
-        return binomial(k + total_damage, total_damage);
+        return binomial(k + free_dots, free_dots);
     }
 
-    if max_hash_end < length {
-        let (left, right) = filter.split_at(max_hash_end);
-        let end = right.split_at(1).1;
-        debug!("Splitting {filter} -> {left}[?]{end}");
-        return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
-            + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
-    } else {
-        let (left, right) = filter.split_at(max_hash_start - 1);
-        let end = right.split_at(1).1;
-        debug!("Splitting {filter} -> {left}[?]{end}");
-        return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
-            + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
-    }
+    // if max_hash_end < length {
+    //     let (left, right) = filter.split_at(max_hash_end);
+    //     let end = right.split_at(1).1;
+    //     debug!("Splitting {filter} -> {left}[?]{end}");
+    //     return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
+    //         + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
+    // } else {
+    //     let (left, right) = filter.split_at(max_hash_start - 1);
+    //     let end = right.split_at(1).1;
+    //     debug!("Splitting {filter} -> {left}[?]{end}");
+    //     return possible_arrangements(damage_sizes, (left.to_string() + "." + end).as_str())
+    //         + possible_arrangements(damage_sizes, (left.to_string() + "#" + end).as_str());
+    // }
 
     // if let Some(i) = filter.find("?#") {
     //     let (l, r) = filter.split_at(i);
@@ -181,33 +178,39 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
     //     let option_2 = l.to_string() + "##" + r;
     //     return possible_arrangements(damage_sizes, option_1.as_str())
     //         + possible_arrangements(damage_sizes, option_2.as_str());
+    // } else if let Some(i) = filter.find("#?") {
+    //     let (l, r) = filter.split_at(i);
+    //     let (_, r) = r.split_at(2);
+    //     let option_1 = l.to_string() + "#." + r;
+    //     let option_2 = l.to_string() + "##" + r;
+    //     return possible_arrangements(damage_sizes, option_1.as_str())
+    //         + possible_arrangements(damage_sizes, option_2.as_str());
     // }
 
     // Brute force
-    // let free_dots = length - mandatory_size;
-    //
-    // let (n, damage_sizes) = damage_sizes.split_last().unwrap();
-    //
-    // let mut arrangements = 0;
-    //
-    // let mut midfix = str::repeat("#", *n);
-    // if !damage_sizes.is_empty() {
-    //     midfix = format!(".{}", midfix);
-    // }
-    //
-    // for suffix_dots in 0..free_dots + 1 {
-    //     let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
-    //     let suffix_len = suffix.len();
-    //     let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
-    //
-    //     if !validate(suffix.as_str(), suffix_filter) {
-    //         continue;
-    //     }
-    //
-    //     arrangements += possible_arrangements(damage_sizes, prefix_filter);
-    // }
-    //
-    // arrangements.into()
+
+    let (n, damage_sizes) = damage_sizes.split_last().unwrap();
+
+    let mut arrangements = 0;
+
+    let mut midfix = str::repeat("#", *n);
+    if !damage_sizes.is_empty() {
+        midfix = format!(".{}", midfix);
+    }
+
+    for suffix_dots in 0..free_dots + 1 {
+        let suffix = format!("{}{}", midfix, str::repeat(".", suffix_dots));
+        let suffix_len = suffix.len();
+        let (prefix_filter, suffix_filter) = filter.split_at(length - suffix_len);
+
+        if !validate(suffix.as_str(), suffix_filter) {
+            continue;
+        }
+
+        arrangements += possible_arrangements(damage_sizes, prefix_filter);
+    }
+
+    arrangements.into()
 }
 
 #[derive(Debug)]
@@ -304,6 +307,68 @@ pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
 mod test {
     use super::*;
     use indoc::indoc;
+
+    #[test]
+    fn example_1() {
+        let example = indoc! {"
+            ???.### 1,1,3
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            1
+        );
+    }
+
+    #[test]
+    fn example_2() {
+        let example = indoc! {"
+            .??..??...?##. 1,1,3
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            16384
+        );
+    }
+    #[test]
+    fn example_3() {
+        let example = indoc! {"
+            ?#?#?#?#?#?#?#? 1,3,1,6
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            1
+        );
+    }
+    #[test]
+    fn example_4() {
+        let example = indoc! {"
+            ????.#...#... 4,1,1
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            16
+        );
+    }
+    #[test]
+    fn example_5() {
+        let example = indoc! {"
+            ????.######..#####. 1,6,5
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            2500
+        );
+    }
+    #[test]
+    fn example_6() {
+        let example = indoc! {"
+            ?###???????? 3,2,1
+        "};
+        assert_eq!(
+            sum_possible_arrangements(example.lines().map(String::from)),
+            506250
+        );
+    }
 
     #[test]
     fn full_example() {
