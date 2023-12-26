@@ -20,6 +20,9 @@ fn validate_damage_sizes(damage_sizes: &[usize], candidates: &[usize]) -> bool {
         return false;
     }
 
+    if candidates.iter().max() > damage_sizes.iter().max() {
+        return false;
+    }
     // for (candi, damage) in zip(
     //     candidates.iter().sorted().rev(),
     //     damage_sizes.iter().sorted().rev(),
