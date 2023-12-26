@@ -20,15 +20,15 @@ fn validate_damage_sizes(damage_sizes: &[usize], candidates: &[usize]) -> bool {
         return false;
     }
 
-    for (candi, damage) in zip(
-        candidates.iter().sorted().rev(),
-        damage_sizes.iter().sorted().rev(),
-    ) {
-        if candi > damage {
-            trace!("{candidates:?} > {damage_sizes:?} => fail");
-            return false;
-        }
-    }
+    // for (candi, damage) in zip(
+    //     candidates.iter().sorted().rev(),
+    //     damage_sizes.iter().sorted().rev(),
+    // ) {
+    //     if candi > damage {
+    //         trace!("{candidates:?} > {damage_sizes:?} => fail");
+    //         return false;
+    //     }
+    // }
 
     true
 }
@@ -81,7 +81,7 @@ fn split_at_middle_match<const C: char>(s: &str) -> Option<(&str, &str)> {
 }
 
 fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
-    trace!(filter);
+    trace!("=== {filter} : {damage_sizes:?} ===");
     // Plan:
     //
     // Given S, D = (n_1, ..., n_k)
@@ -120,12 +120,16 @@ fn possible_arrangements(damage_sizes: &[usize], filter: &str) -> usize {
 
     // Divide on "middlemost" '.'
     if let Some((filter_left, filter_right)) = split_at_middle_match::<'.'>(filter) {
+        trace!(". split => {filter_left}[.]{filter_right}");
         let mut arrangements = 0;
         for i in 0..damage_sizes.len() + 1 {
             let (damage_left, damage_right) = damage_sizes.split_at(i);
-            arrangements += possible_arrangements(damage_left, filter_left)
+            let split_arrangements = possible_arrangements(damage_left, filter_left)
                 * possible_arrangements(damage_right, filter_right);
+            trace!("{filter} split {damage_left:?}|{damage_right:?} => {split_arrangements}");
+            arrangements += split_arrangements;
         }
+        trace!("{filter} * {damage_sizes:?} => {arrangements} arrangements");
         return arrangements;
     }
 
