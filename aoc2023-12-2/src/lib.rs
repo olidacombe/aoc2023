@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use num_integer::binomial;
+use rayon::prelude::*;
 use std::{
     iter::{repeat, zip},
     ops::{Add, AddAssign, Mul},
@@ -245,8 +246,7 @@ impl AddAssign for PossibleArrangements {
 pub fn sum_possible_arrangements(it: impl Iterator<Item = String>) -> usize {
     let records: Vec<ConditionRecord> = it.map(|line| ConditionRecord::from(line) * 5).collect();
     records
-        // .par_iter()
-        .iter()
+        .par_iter()
         .enumerate()
         .map(|(i, r)| {
             info!("{i}: {:?}", &r);
