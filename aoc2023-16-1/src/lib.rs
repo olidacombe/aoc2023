@@ -118,14 +118,14 @@ impl<I: Iterator<Item = String>> From<I> for Contraption {
             visited.push(vec![false; line.len()]);
         }
 
-        let mut visited_from_east = visited.clone();
-        visited_from_east[0][0] = true;
+        let mut visited_from_west = visited.clone();
+        visited_from_west[0][0] = true;
 
         Self {
             layout,
-            visited_from_east,
+            visited_from_east: visited.clone(),
             visited_from_north: visited.clone(),
-            visited_from_west: visited.clone(),
+            visited_from_west,
             visited_from_south: visited,
             rays: vec![Ray::new(0, 0, Direction::East)],
         }
