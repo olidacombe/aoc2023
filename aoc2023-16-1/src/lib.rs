@@ -111,7 +111,7 @@ struct Contraption {
 
 impl<I: Iterator<Item = String>> From<I> for Contraption {
     fn from(value: I) -> Self {
-        let mut layout = Vec::new();
+        let mut layout = Vec::<Vec<char>>::new();
         let mut visited = Vec::new();
         for line in value {
             layout.push(line.chars().into_iter().collect());
@@ -121,13 +121,20 @@ impl<I: Iterator<Item = String>> From<I> for Contraption {
         let mut visited_from_west = visited.clone();
         visited_from_west[0][0] = true;
 
+        let mut init_ray = Ray::new(0, 0, Direction::East);
+        let mut rays = Vec::new();
+        if let Some(ray_2) = init_ray.redirect(layout[0][0]) {
+            rays.push(ray_2);
+        }
+        rays.push(init_ray);
+
         Self {
             layout,
             visited_from_east: visited.clone(),
             visited_from_north: visited.clone(),
             visited_from_west,
             visited_from_south: visited,
-            rays: vec![Ray::new(0, 0, Direction::East)],
+            rays,
         }
     }
 }
@@ -135,9 +142,9 @@ impl<I: Iterator<Item = String>> From<I> for Contraption {
 impl Contraption {
     pub fn num_energized_tiles(&self) -> usize {
         let mut count = 0;
-        for (i, line) in self.visited_from_east.iter().enumerate() {
-            for (j, visited) in line.iter().enumerate() {
-                if *visited
+        for i in 0..self.height() {
+            for j in 0..self.width() {
+                if self.visited_from_east[i][j]
                     || self.visited_from_north[i][j]
                     || self.visited_from_west[i][j]
                     || self.visited_from_south[i][j]
@@ -146,7 +153,6 @@ impl Contraption {
                 }
             }
         }
-
         count
     }
 
