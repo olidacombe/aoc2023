@@ -10,6 +10,9 @@ struct History(String);
 impl Add<char> for &History {
     type Output = History;
     fn add(self, rhs: char) -> Self::Output {
+        if !self.0.ends_with(rhs) {
+            return History(rhs.to_string());
+        }
         let mut inner = self.0.clone();
         inner.push(rhs);
         if inner.len() > 3 {
@@ -69,7 +72,15 @@ impl Add<(char, usize)> for &Cost {
             .iter()
             .filter(|(k, _)| !bad_endings.iter().any(|bad| k.0.ends_with(bad)))
         {
-            inner.insert(k + ch, v + cost);
+            let history = k + ch;
+            let new_cost = v + cost;
+            if let Some(existing) = inner.get_mut(&history) {
+                if new_cost < *existing {
+                    *existing = new_cost;
+                }
+            } else {
+                inner.insert(k + ch, v + cost);
+            }
         }
 
         Cost(inner)
