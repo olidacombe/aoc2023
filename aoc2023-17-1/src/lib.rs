@@ -2,8 +2,7 @@ use std::{
     collections::{BinaryHeap, HashMap},
     ops::{Add, AddAssign},
 };
-
-use nom::{character::complete::digit1, multi::many1, IResult};
+use tracing::debug;
 
 #[derive(Eq, Default, Hash, PartialEq, Clone, Debug)]
 struct History(String);
@@ -135,13 +134,8 @@ impl PartialOrd for State {
     }
 }
 
-fn parse_line(input: &str) -> IResult<&str, Vec<&str>> {
-    many1(digit1)(input)
-}
-
 struct Map {
     blocks: Vec<usize>,
-    height: usize,
     width: usize,
 }
 
@@ -149,10 +143,8 @@ impl<I: Iterator<Item = String>> From<I> for Map {
     fn from(lines: I) -> Self {
         let mut blocks = Vec::new();
         let lines = lines.peekable();
-        let mut height = 0;
         let mut width = 0;
         for line in lines {
-            height += 1;
             width = line.len();
             blocks.append(
                 &mut line
@@ -162,11 +154,7 @@ impl<I: Iterator<Item = String>> From<I> for Map {
             );
         }
 
-        Self {
-            blocks,
-            height,
-            width,
-        }
+        Self { blocks, width }
     }
 }
 
@@ -179,7 +167,15 @@ impl Map {
         let mut heap = BinaryHeap::new();
         heap.push(State::init(start));
 
+        debug!("Searching {}-node graph", self.blocks.len());
+        let mut greatest_visit = 0;
+
         while let Some(State { cost, node }) = heap.pop() {
+            if node > greatest_visit {
+                debug!("Reached node {node}");
+                greatest_visit = node;
+            }
+
             if node == end {
                 dbg!(&cost);
                 return *cost.best().unwrap();
