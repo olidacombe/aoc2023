@@ -58,6 +58,12 @@ impl History {
             })
             .unwrap_or_else(Vec::new)
     }
+
+    pub fn subsies(&self) -> Vec<History> {
+        let mut ret = self.shorties();
+        ret.push(self.clone());
+        ret
+    }
 }
 
 #[derive(Eq, PartialEq, Default, Debug)]
@@ -71,13 +77,11 @@ impl Cost {
         if self.is_empty() {
             return false;
         }
-        // TODO incorporate shorties, i.e. self beats other if self has any smaller shorty
         // return true if self gains nothing (no new history, or better cost) from other
         other.pathwise.iter().all(|(k, v)| {
-            if let Some(reigning) = self.pathwise.get(k) {
-                return v > reigning;
-            }
-            false
+            k.subsies()
+                .iter()
+                .any(|s| self.pathwise.get(s).filter(|w| w < &v).is_some())
         })
     }
 
