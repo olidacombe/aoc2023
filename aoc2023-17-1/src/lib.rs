@@ -2,7 +2,27 @@ use std::{
     collections::{BinaryHeap, HashMap},
     ops::{Add, AddAssign},
 };
-use tracing::debug;
+use tracing::{debug, info, trace};
+
+trait Compress {
+    fn compress(&mut self);
+}
+
+impl Compress for HashMap<History, usize> {
+    // kill off any entry where k' contains k and v' >= v
+    fn compress(&mut self) {
+        let to_delete: Vec<_> = self
+            .iter()
+            .filter(|(k, v)| {
+                k.shorties()
+                    .iter()
+                    .any(|s| self.get(s).filter(|w| w <= v).is_some())
+            })
+            .map(|(k, _)| k.clone())
+            .collect();
+        self.retain(|k, _| !to_delete.contains(k));
+    }
+}
 
 #[derive(Eq, Default, Hash, PartialEq, Clone, Debug)]
 struct History(String);
@@ -22,14 +42,39 @@ impl Add<char> for &History {
     }
 }
 
+impl History {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn shorties(&self) -> Vec<History> {
+        self.0
+            .chars()
+            .next()
+            .map(|ch| match self.len() {
+                2 => vec![History(format!("{ch}"))],
+                3 => vec![History(format!("{ch}{ch}")), History(format!("{ch}"))],
+                _ => Vec::new(),
+            })
+            .unwrap_or_else(Vec::new)
+    }
+}
+
 #[derive(Eq, PartialEq, Default, Debug)]
-struct Cost(HashMap<History, usize>);
+struct Cost {
+    pathwise: HashMap<History, usize>,
+    heuristic: usize,
+}
 
 impl Cost {
     pub fn beats(&self, other: &Self) -> bool {
+        if self.is_empty() {
+            return false;
+        }
+        // TODO incorporate shorties, i.e. self beats other if self has any smaller shorty
         // return true if self gains nothing (no new history, or better cost) from other
-        other.0.iter().any(|(k, v)| {
-            if let Some(reigning) = self.0.get(k) {
+        other.pathwise.iter().all(|(k, v)| {
+            if let Some(reigning) = self.pathwise.get(k) {
                 return v > reigning;
             }
             false
@@ -37,23 +82,38 @@ impl Cost {
     }
 
     pub fn best(&self) -> Option<&usize> {
-        self.0.values().min()
+        self.pathwise.values().min()
+    }
+
+    pub fn comparator(&self) -> Option<usize> {
+        self.best().map(|pathwise| pathwise + self.heuristic)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.pathwise.is_empty()
     }
 
-    pub fn zero() -> Self {
-        Self(HashMap::from([(History::default(), 0)]))
+    pub fn new(mut pathwise: HashMap<History, usize>, heuristic: usize) -> Self {
+        pathwise.compress();
+        Self {
+            pathwise,
+            heuristic,
+        }
+    }
+
+    pub fn zero(heuristic: usize) -> Self {
+        Self::new(HashMap::new(), heuristic)
     }
 }
 
-impl Add<(char, usize)> for &Cost {
+impl Add<(char, usize, usize)> for &Cost {
     type Output = Cost;
 
-    fn add(self, rhs: (char, usize)) -> Self::Output {
-        let (ch, cost) = rhs;
+    fn add(self, rhs: (char, usize, usize)) -> Self::Output {
+        let (ch, cost, heuristic) = rhs;
+        if self.is_empty() {
+            return Cost::new(HashMap::from([(History(ch.to_string()), cost)]), heuristic);
+        }
         let mut inner = HashMap::new();
         let bad_endings = [
             format!("{ch}{ch}{ch}"),
@@ -62,13 +122,15 @@ impl Add<(char, usize)> for &Cost {
                 '^' => "v",
                 '<' => ">",
                 'v' => "^",
-                _ => "",
+                _ => {
+                    unreachable!("only <^>v are valid directions");
+                }
             }
             .to_string(),
         ];
 
         for (k, v) in self
-            .0
+            .pathwise
             .iter()
             .filter(|(k, _)| !bad_endings.iter().any(|bad| k.0.ends_with(bad)))
         {
@@ -83,28 +145,30 @@ impl Add<(char, usize)> for &Cost {
             }
         }
 
-        Cost(inner)
+        inner.compress();
+        Cost::new(inner, heuristic)
     }
 }
 
 impl AddAssign<&Cost> for Cost {
     fn add_assign(&mut self, rhs: &Self) {
-        for (k, v) in rhs.0.iter() {
-            if let Some(existing) = self.0.get_mut(k) {
+        for (k, v) in rhs.pathwise.iter() {
+            if let Some(existing) = self.pathwise.get_mut(k) {
                 if v < existing {
                     *existing = *v;
                 }
             } else {
-                self.0.insert(k.clone(), *v);
+                self.pathwise.insert(k.clone(), *v);
             }
         }
+        self.pathwise.compress();
     }
 }
 
 impl Ord for Cost {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if let Some(ours) = self.best() {
-            return other.best().cmp(&Some(ours));
+        if let Some(ours) = self.comparator() {
+            return other.comparator().cmp(&Some(ours));
         }
         std::cmp::Ordering::Less
     }
@@ -123,9 +187,9 @@ struct State {
 }
 
 impl State {
-    pub fn init(node: usize) -> Self {
+    pub fn init(node: usize, heuristic: usize) -> Self {
         Self {
-            cost: Cost::zero(),
+            cost: Cost::zero(heuristic),
             node,
         }
     }
@@ -170,18 +234,29 @@ impl<I: Iterator<Item = String>> From<I> for Map {
 }
 
 impl Map {
+    pub fn heuristic(&self, start: usize, end: usize) -> usize {
+        // let's be cowboys and assume end > start
+        let diff = end - start;
+        // manhattan distance
+        diff / self.width + diff % self.width
+    }
+}
+
+impl Map {
     pub fn minimum_heat_loss(&self) -> usize {
         let start = 0;
         let end = self.blocks.len() - 1;
-        let mut dist: Vec<_> = (0..self.blocks.len()).map(|_| Cost::default()).collect();
-        dist[start] = Cost::zero();
+        let mut dist: Vec<_> = (0..self.blocks.len())
+            .map(|i| Cost::zero(self.heuristic(i, end)))
+            .collect();
         let mut heap = BinaryHeap::new();
-        heap.push(State::init(start));
+        heap.push(State::init(start, self.heuristic(start, end)));
 
-        debug!("Searching {}-node graph", self.blocks.len());
+        info!("Searching {}-node graph", self.blocks.len());
         let mut greatest_visit = 0;
 
         while let Some(State { cost, node }) = heap.pop() {
+            trace!("[{node}]{cost:?}");
             if node > greatest_visit {
                 debug!("Reached node {node}");
                 greatest_visit = node;
@@ -193,12 +268,15 @@ impl Map {
             }
 
             if dist[node].beats(&cost) {
+                trace!("existing {:?} beats {cost:?}, skipping", dist[node]);
                 continue;
             }
 
             for (direction, node) in self.neighbours(node) {
-                let cost = &cost + (direction, self.blocks[node]);
+                trace!("{direction}{node}");
+                let cost = &cost + (direction, self.blocks[node], self.heuristic(node, end));
                 if cost.is_empty() {
+                    trace!("Empty:{cost:?}");
                     continue;
                 }
                 let next = State { cost, node };
@@ -252,23 +330,32 @@ mod test {
     #[test]
     fn empty_cost_ord() {
         let empty = Cost::default();
-        let non_emtpy = Cost(HashMap::from([(History::default(), 1 as usize)]));
+        let non_emtpy = Cost {
+            pathwise: HashMap::from([(History::default(), 1 as usize)]),
+            heuristic: 0,
+        };
         // good because we are using max heap and None represents infinite cost
         assert!(empty < non_emtpy);
     }
 
     #[test]
     fn cost_ord() {
-        let a = Cost(HashMap::from([
-            (History::default(), 1 as usize),
-            (History::default(), 2),
-        ]));
-        let b = Cost(HashMap::from([
-            (History::default(), 2 as usize),
-            (History::default(), 3),
-        ]));
+        let a = Cost {
+            pathwise: HashMap::from([(History::default(), 1 as usize), (History::default(), 2)]),
+            heuristic: 0,
+        };
+        let b = Cost {
+            pathwise: HashMap::from([(History::default(), 2 as usize), (History::default(), 3)]),
+            heuristic: 0,
+        };
         // good because we are using max heap so small is preferred
         assert!(a > b);
+    }
+
+    #[test]
+    fn shorties() {
+        let history = History(">".to_string());
+        assert_eq!(history.shorties(), vec![]);
     }
 
     #[test]
