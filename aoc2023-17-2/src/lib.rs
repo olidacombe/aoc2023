@@ -46,6 +46,9 @@ impl History {
         inner.push(rhs);
         Some(Self(inner))
     }
+    pub fn can_stop(&self) -> bool {
+        self.0.len() > 3
+    }
 
     fn len(&self) -> usize {
         self.0.len()
@@ -65,6 +68,14 @@ impl Cost {
             .pathwise
             .iter()
             .all(|(k, v)| self.pathwise.get(k).filter(|w| w <= &v).is_some())
+    }
+
+    pub fn best_stop(&self) -> Option<usize> {
+        self.pathwise
+            .iter()
+            .filter(|(k, _)| k.can_stop())
+            .map(|(_, v)| *v)
+            .min()
     }
 
     pub fn best(&self) -> Option<&usize> {
@@ -231,8 +242,10 @@ impl Map {
             }
 
             if node == end {
-                info!("Found {end} with {cost:?}");
-                return *cost.best().unwrap();
+                if let Some(best) = cost.best_stop() {
+                    info!("Found {end} with {cost:?}");
+                    return best;
+                }
             }
 
             // This was short-circuiting too early!!!
