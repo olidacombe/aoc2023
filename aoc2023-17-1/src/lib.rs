@@ -74,14 +74,11 @@ struct Cost {
 
 impl Cost {
     pub fn beats(&self, other: &Self) -> bool {
-        if self.is_empty() {
-            return false;
-        }
         // return true if self gains nothing (no new history, or better cost) from other
         other.pathwise.iter().all(|(k, v)| {
             k.subsies()
                 .iter()
-                .any(|s| self.pathwise.get(s).filter(|w| w < &v).is_some())
+                .any(|s| self.pathwise.get(s).filter(|w| w <= &v).is_some())
         })
     }
 
@@ -255,6 +252,7 @@ impl Map {
             .collect();
         let mut heap = BinaryHeap::new();
         heap.push(State::init(start, self.heuristic(start, end)));
+        // let mut visited = HashSet::<usize>::new();
 
         info!("Searching {}-node graph", self.blocks.len());
         let mut greatest_visit = 0;
@@ -267,14 +265,15 @@ impl Map {
             }
 
             if node == end {
-                dbg!(&cost);
+                info!("Found {end} with {cost:?}");
                 return *cost.best().unwrap();
             }
 
-            if dist[node].beats(&cost) {
-                trace!("existing {:?} beats {cost:?}, skipping", dist[node]);
-                continue;
-            }
+            // This was short-circuiting too early!!!
+            // if !visited.insert(node) && dist[node].beats(&cost) {
+            //     trace!("existing {:?} beats {cost:?}, skipping", dist[node]);
+            //     continue;
+            // }
 
             for (direction, node) in self.neighbours(node) {
                 trace!("{direction}{node}");
@@ -286,10 +285,9 @@ impl Map {
                 let next = State { cost, node };
 
                 if !dist[node].beats(&next.cost) {
+                    trace!("Found cost improvement for [{node}]");
                     dist[node] += &next.cost;
-                    if next.node == end {
-                        dbg!(&next.cost);
-                    }
+                    trace!("{:?} < {:?}", &next.cost, dist[node]);
                     heap.push(next);
                 }
             }
@@ -324,6 +322,7 @@ pub fn minimum_heat_loss(it: impl Iterator<Item = String>) -> usize {
 mod test {
     use super::*;
     use indoc::indoc;
+    use tracing_test::traced_test;
 
     #[test]
     fn option_ord() {
@@ -362,6 +361,7 @@ mod test {
         assert_eq!(history.shorties(), vec![]);
     }
 
+    #[traced_test]
     #[test]
     fn full_example() {
         let example = indoc! {"

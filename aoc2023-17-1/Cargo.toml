@@ -10,3 +10,4 @@ tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }
+tracing-test = { workspace = true }
