@@ -7,62 +7,25 @@ use nom::{
     IResult,
 };
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Direction {
-    R,
-    U,
-    L,
-    D,
-}
-
-impl Direction {
-    pub fn flipped(self) -> Self {
-        match self {
-            Direction::R => Direction::L,
-            Direction::U => Direction::D,
-            Direction::L => Direction::R,
-            Direction::D => Direction::U,
-        }
-    }
-
-    pub fn parallel(&self, rhs: &Self) -> i8 {
-        match self {
-            Direction::R => match rhs {
-                Direction::R => 1,
-                Direction::L => -1,
-                _ => 0,
-            },
-            Direction::U => match rhs {
-                Direction::U => 1,
-                Direction::D => -1,
-                _ => 0,
-            },
-            Direction::L => match rhs {
-                Direction::L => 1,
-                Direction::R => -1,
-                _ => 0,
-            },
-            Direction::D => match rhs {
-                Direction::D => 1,
-                Direction::U => -1,
-                _ => 0,
-            },
-        }
-    }
+    H,
+    V,
 }
 
 impl From<&str> for Direction {
     fn from(value: &str) -> Self {
         match value {
-            "R" => Direction::R,
-            "U" => Direction::U,
-            "L" => Direction::L,
-            "D" => Direction::D,
+            "R" => Direction::H,
+            "U" => Direction::V,
+            "L" => Direction::H,
+            "D" => Direction::V,
             _ => unreachable!(),
         }
     }
 }
 
+#[derive(Debug)]
 struct Colour {
     r: u8,
     g: u8,
@@ -78,9 +41,10 @@ impl From<&str> for Colour {
     }
 }
 
+#[derive(Debug)]
 struct Instruction {
     direction: Direction,
-    length: usize,
+    count: i64,
     colour: Colour,
 }
 
@@ -94,10 +58,17 @@ fn parse_instruciton(input: &str) -> IResult<&str, ((&str, &str), &str)> {
 
 impl From<String> for Instruction {
     fn from(value: String) -> Self {
-        let ((direction, length), colour) = parse_instruciton(value.as_str()).unwrap().1;
+        let ((direction, count), colour) = parse_instruciton(value.as_str()).unwrap().1;
+        let mut count = count.parse().unwrap();
+        match direction {
+            "L" | "U" => {
+                count *= -1;
+            }
+            _ => {}
+        }
         Self {
             direction: Direction::from(direction),
-            length: length.parse().unwrap(),
+            count,
             colour: Colour::from(colour),
         }
     }
@@ -106,56 +77,16 @@ impl From<String> for Instruction {
 struct Rover {
     x: usize,
     y: usize,
-    last_direction: Option<Direction>,
     boundary_stack: Vec<usize>,
 }
 
 impl Rover {
-    fn boundary_coord(&self) -> usize {
-        match self.last_direction.as_ref().unwrap() {
-            Direction::U | Direction::D => self.y,
-            Direction::R | Direction::L => self.x,
-        }
-    }
-
-    pub fn mv(&mut self, instruction: Instruction) {
-        if self.last_direction.is_none() {
-            self.last_direction = Some(instruction.direction.clone());
-        }
-        if instruction.direction == Direction::U && instruction.length > self.y {
-            if self
-                .last_direction
-                .as_ref()
-                .unwrap()
-                .parallel(&instruction.direction)
-                != 0
-            {
-                let diff = instruction.length.abs_diff(self.y);
-                self.boundary_stack.iter_mut().for_each(|i| *i = *i + diff);
-                self.y += diff;
-            }
-        } else if instruction.direction == Direction::L && instruction.length > self.x {
-            if self
-                .last_direction
-                .as_ref()
-                .unwrap()
-                .parallel(&instruction.direction)
-                != 0
-            {
-                let diff = instruction.length.abs_diff(self.x);
-                self.boundary_stack.iter_mut().for_each(|i| *i = *i + diff);
-                self.x += diff;
-            }
-        }
-        if self.last_direction.as_ref().unwrap().parallel(&instruction.direction) == 1 {
-        }
-        else if self.last_direction.as_ref().unwrap().parallel(&instruction.direction) == -1 {
-        self.boundary_stack.push(self.boundary_coord());
-    }
+    pub fn mv(&mut self, instruction: Instruction) {}
 }
 
 pub fn cubic_meters_of_lava(it: impl Iterator<Item = String>) -> usize {
     let instructions: Vec<_> = it.map(Instruction::from).collect();
+    dbg!(&instructions);
     usize::default()
 }
 
