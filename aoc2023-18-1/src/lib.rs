@@ -1,6 +1,7 @@
+use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
-    ops::{RangeBounds, RangeFrom, RangeTo},
+    ops::{RangeBounds, RangeFrom, RangeInclusive, RangeTo},
 };
 
 use nom::{
@@ -78,10 +79,19 @@ impl From<String> for Instruction {
     }
 }
 
-#[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq)]
 struct Point {
     x: i64,
     y: i64,
+}
+
+impl Point {
+    pub fn x(&self) -> i64 {
+        self.x
+    }
+    pub fn y(&self) -> i64 {
+        self.y
+    }
 }
 
 impl From<(i64, i64)> for Point {
@@ -134,68 +144,136 @@ struct Rover {
     path: HashSet<Point>,
 }
 
+impl fmt::Display for Rover {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ret = String::default();
+
+        for y in self.rows() {
+            for x in self.cols() {
+                if self.path.contains(&(x, y).into()) {
+                    ret.push_str("#");
+                } else {
+                    ret.push_str(".");
+                }
+            }
+            ret.push('\n');
+        }
+
+        ret.push('\n');
+
+        for y in self.rows() {
+            for x in self.cols() {
+                if self.is_exterior((x, y).into()) {
+                    ret.push_str(".");
+                } else {
+                    ret.push_str("#");
+                }
+            }
+            ret.push('\n');
+        }
+        write!(f, "{ret}")
+    }
+}
+
 impl Default for Rover {
     fn default() -> Self {
         Self {
             location: Point::default(),
-            exterior_plus: HashMap::default(),
-            exterior_minus: HashMap::default(),
+            exterior_plus: HashMap::from([(0, Vec::default())]),
+            exterior_minus: HashMap::from([(0, Vec::default())]),
             path: HashSet::from([Point::default()]),
         }
     }
 }
 
 impl Rover {
+    fn area(&self) -> usize {
+        self.rows()
+            .map(|y| {
+                self.cols()
+                    .filter(|x| !self.is_exterior((*x, y).into()))
+                    .count()
+            })
+            .sum()
+    }
+
     fn is_exterior(&self, point: Point) -> bool {
+        // dbg!(&point);
         !self.path.contains(&point)
             && self.exterior_plus[&point.y]
                 .iter()
                 .filter(|range| range.contains(&point.x))
-                .count()
+                .count() as i64
                 - self.exterior_minus[&point.y]
                     .iter()
                     .filter(|range| range.contains(&point.x))
-                    .count()
+                    .count() as i64
                 == 0
     }
 
     pub fn rove(&mut self, instruction: Instruction) {
+        let increment = if instruction.count > 0 { 1 } else { -1 };
         match instruction.direction {
             Direction::H => {
-                self.location.x += instruction.count;
+                for _ in 0..instruction.count.abs() {
+                    self.path.insert(self.location);
+                    self.location.x += increment;
+                }
             }
             Direction::V => {
-                self.location.y += instruction.count;
-                let plus = self
-                    .exterior_plus
-                    .entry(self.location.y)
-                    .or_insert_with(Vec::default);
-                let minus = self
-                    .exterior_minus
-                    .entry(self.location.y)
-                    .or_insert_with(Vec::default);
-                if instruction.count > 0 {
-                    plus.push((self.location.x..).into());
-                    minus.push((..self.location.x).into());
-                } else {
-                    plus.push((..self.location.x).into());
-                    minus.push((self.location.x..).into());
+                for _ in 0..instruction.count.abs() {
+                    self.path.insert(self.location);
+                    if instruction.count > 0 {
+                        self.location.y += increment;
+                        let plus = self
+                            .exterior_plus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        let minus = self
+                            .exterior_minus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        plus.push((self.location.x..).into());
+                        minus.push((..self.location.x).into());
+                    }
+                    if instruction.count < 0 {
+                        let plus = self
+                            .exterior_plus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        let minus = self
+                            .exterior_minus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        plus.push((..self.location.x).into());
+                        minus.push((self.location.x..).into());
+                        self.location.y += increment;
+                    }
                 }
             }
         }
-        self.path.insert(self.location);
     }
 
-    fn origin(&self) -> Point {
-        // todo
-        (0, 0).into()
+    fn cols(&self) -> RangeInclusive<i64> {
+        let min = self.path.iter().map(Point::x).min().unwrap();
+        let max = self.path.iter().map(Point::x).max().unwrap();
+        min..=max
+    }
+
+    fn rows(&self) -> RangeInclusive<i64> {
+        let min = self.path.iter().map(Point::y).min().unwrap();
+        let max = self.path.iter().map(Point::y).max().unwrap();
+        min..=max
     }
 }
 
 pub fn cubic_meters_of_lava(it: impl Iterator<Item = String>) -> usize {
-    let instructions: Vec<_> = it.map(Instruction::from).collect();
-    dbg!(&instructions);
-    usize::default()
+    let mut rover = Rover::default();
+    for instruction in it.map(Instruction::from) {
+        rover.rove(instruction);
+    }
+    println!("{rover}");
+    rover.area()
 }
 
 #[cfg(test)]
