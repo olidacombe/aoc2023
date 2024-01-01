@@ -226,20 +226,29 @@ impl Rover {
             Direction::V => {
                 for _ in 0..instruction.count.abs() {
                     self.path.insert(self.location);
-                    self.location.y += increment;
-                    let plus = self
-                        .exterior_plus
-                        .entry(self.location.y)
-                        .or_insert_with(Vec::default);
-                    let minus = self
-                        .exterior_minus
-                        .entry(self.location.y)
-                        .or_insert_with(Vec::default);
                     if instruction.count > 0 {
+                        self.location.y += increment;
+                        let plus = self
+                            .exterior_plus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        let minus = self
+                            .exterior_minus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
                         plus.push((self.location.x..).into());
                         minus.push((..self.location.x).into());
                     }
                     if instruction.count < 0 {
+                        let plus = self
+                            .exterior_plus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        let minus = self
+                            .exterior_minus
+                            .entry(self.location.y)
+                            .or_insert_with(Vec::default);
+                        self.location.y += increment;
                         plus.push((..self.location.x).into());
                         minus.push((self.location.x..).into());
                     }
