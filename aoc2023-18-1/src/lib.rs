@@ -199,10 +199,12 @@ impl Rover {
     }
 
     fn is_exterior(&self, point: Point) -> bool {
-        // dbg!(&point);
+        if !(self.exterior_minus.contains_key(&point.y)
+            && self.exterior_plus.contains_key(&point.y))
+        {
+            return !self.path.contains(&point);
+        }
         !self.path.contains(&point)
-            && self.exterior_plus.contains_key(&point.y)
-            && self.exterior_minus.contains_key(&point.y)
             && self.exterior_plus[&point.y]
                 .iter()
                 .filter(|range| range.contains(&point.x))
@@ -227,7 +229,6 @@ impl Rover {
                 for _ in 0..instruction.count.abs() {
                     self.path.insert(self.location);
                     if instruction.count > 0 {
-                        self.location.y += increment;
                         let plus = self
                             .exterior_plus
                             .entry(self.location.y)
@@ -238,8 +239,10 @@ impl Rover {
                             .or_insert_with(Vec::default);
                         plus.push((self.location.x..).into());
                         minus.push((..self.location.x).into());
+                        self.location.y += increment;
                     }
                     if instruction.count < 0 {
+                        self.location.y += increment;
                         let plus = self
                             .exterior_plus
                             .entry(self.location.y)
@@ -248,7 +251,6 @@ impl Rover {
                             .exterior_minus
                             .entry(self.location.y)
                             .or_insert_with(Vec::default);
-                        self.location.y += increment;
                         plus.push((..self.location.x).into());
                         minus.push((self.location.x..).into());
                     }
