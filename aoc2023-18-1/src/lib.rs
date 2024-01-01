@@ -1,7 +1,11 @@
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{RangeBounds, RangeFrom, RangeTo},
+};
+
 use nom::{
-    branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, digit1, u32},
+    character::complete::{alpha1, digit1},
     character::complete::{hex_digit1, multispace1},
     sequence::{delimited, separated_pair},
     IResult,
@@ -74,14 +78,118 @@ impl From<String> for Instruction {
     }
 }
 
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+impl From<(i64, i64)> for Point {
+    fn from(value: (i64, i64)) -> Self {
+        Self {
+            x: value.0,
+            y: value.1,
+        }
+    }
+}
+
+enum Range {
+    From(RangeFrom<i64>),
+    To(RangeTo<i64>),
+}
+
+impl RangeBounds<i64> for Range {
+    fn start_bound(&self) -> std::ops::Bound<&i64> {
+        match self {
+            Self::From(r) => r.start_bound(),
+            Self::To(r) => r.start_bound(),
+        }
+    }
+    fn end_bound(&self) -> std::ops::Bound<&i64> {
+        match self {
+            Self::From(r) => r.end_bound(),
+            Self::To(r) => r.end_bound(),
+        }
+    }
+}
+
+impl From<RangeFrom<i64>> for Range {
+    fn from(value: RangeFrom<i64>) -> Self {
+        Self::From(value)
+    }
+}
+
+impl From<RangeTo<i64>> for Range {
+    fn from(value: RangeTo<i64>) -> Self {
+        Self::To(value)
+    }
+}
+
 struct Rover {
-    x: usize,
-    y: usize,
-    boundary_stack: Vec<usize>,
+    location: Point,
+    /// row-size ranges adding 1
+    exterior_plus: HashMap<i64, Vec<Range>>,
+    /// row-size ranges adding -1
+    exterior_minus: HashMap<i64, Vec<Range>>,
+    path: HashSet<Point>,
+}
+
+impl Default for Rover {
+    fn default() -> Self {
+        Self {
+            location: Point::default(),
+            exterior_plus: HashMap::default(),
+            exterior_minus: HashMap::default(),
+            path: HashSet::from([Point::default()]),
+        }
+    }
 }
 
 impl Rover {
-    pub fn mv(&mut self, instruction: Instruction) {}
+    fn is_exterior(&self, point: Point) -> bool {
+        !self.path.contains(&point)
+            && self.exterior_plus[&point.y]
+                .iter()
+                .filter(|range| range.contains(&point.x))
+                .count()
+                - self.exterior_minus[&point.y]
+                    .iter()
+                    .filter(|range| range.contains(&point.x))
+                    .count()
+                == 0
+    }
+
+    pub fn rove(&mut self, instruction: Instruction) {
+        match instruction.direction {
+            Direction::H => {
+                self.location.x += instruction.count;
+            }
+            Direction::V => {
+                self.location.y += instruction.count;
+                let plus = self
+                    .exterior_plus
+                    .entry(self.location.y)
+                    .or_insert_with(Vec::default);
+                let minus = self
+                    .exterior_minus
+                    .entry(self.location.y)
+                    .or_insert_with(Vec::default);
+                if instruction.count > 0 {
+                    plus.push((self.location.x..).into());
+                    minus.push((..self.location.x).into());
+                } else {
+                    plus.push((..self.location.x).into());
+                    minus.push((self.location.x..).into());
+                }
+            }
+        }
+        self.path.insert(self.location);
+    }
+
+    fn origin(&self) -> Point {
+        // todo
+        (0, 0).into()
+    }
 }
 
 pub fn cubic_meters_of_lava(it: impl Iterator<Item = String>) -> usize {
