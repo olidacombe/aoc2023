@@ -156,6 +156,7 @@ impl fmt::Display for Rover {
                     ret.push_str(".");
                 }
             }
+            ret.push_str(&format!("{y}"));
             ret.push('\n');
         }
 
@@ -200,6 +201,8 @@ impl Rover {
     fn is_exterior(&self, point: Point) -> bool {
         // dbg!(&point);
         !self.path.contains(&point)
+            && self.exterior_plus.contains_key(&point.y)
+            && self.exterior_minus.contains_key(&point.y)
             && self.exterior_plus[&point.y]
                 .iter()
                 .filter(|range| range.contains(&point.x))
@@ -223,31 +226,22 @@ impl Rover {
             Direction::V => {
                 for _ in 0..instruction.count.abs() {
                     self.path.insert(self.location);
+                    self.location.y += increment;
+                    let plus = self
+                        .exterior_plus
+                        .entry(self.location.y)
+                        .or_insert_with(Vec::default);
+                    let minus = self
+                        .exterior_minus
+                        .entry(self.location.y)
+                        .or_insert_with(Vec::default);
                     if instruction.count > 0 {
-                        self.location.y += increment;
-                        let plus = self
-                            .exterior_plus
-                            .entry(self.location.y)
-                            .or_insert_with(Vec::default);
-                        let minus = self
-                            .exterior_minus
-                            .entry(self.location.y)
-                            .or_insert_with(Vec::default);
                         plus.push((self.location.x..).into());
                         minus.push((..self.location.x).into());
                     }
                     if instruction.count < 0 {
-                        let plus = self
-                            .exterior_plus
-                            .entry(self.location.y)
-                            .or_insert_with(Vec::default);
-                        let minus = self
-                            .exterior_minus
-                            .entry(self.location.y)
-                            .or_insert_with(Vec::default);
                         plus.push((..self.location.x).into());
                         minus.push((self.location.x..).into());
-                        self.location.y += increment;
                     }
                 }
             }
