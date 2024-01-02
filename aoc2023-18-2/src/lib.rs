@@ -21,6 +21,10 @@ struct Limits<T = i64> {
     v: Range<T>,
 }
 
+trait Transpose {
+    fn transposed(self) -> Self;
+}
+
 trait Area {
     fn area(&self) -> Option<usize>;
 }
@@ -31,6 +35,13 @@ impl Area for Limits<i64> {
             .size()
             .zip(self.h.size())
             .map(|(height, width)| height * width)
+    }
+}
+
+impl<T> Transpose for Limits<T> {
+    fn transposed(self) -> Self {
+        let Self { h, v } = self;
+        Self { h: v, v: h }
     }
 }
 
@@ -47,6 +58,16 @@ impl Area for Region {
     fn area(&self) -> Option<usize> {
         match self {
             Region::U(limits) | Region::L(limits) | Region::R(limits) => limits.area(),
+        }
+    }
+}
+
+impl Transpose for Region {
+    fn transposed(self) -> Self {
+        match self {
+            Region::U(limits) => Region::U(limits.transposed()),
+            Region::R(limits) => Region::R(limits.transposed()),
+            Region::L(limits) => Region::L(limits.transposed()),
         }
     }
 }
@@ -69,21 +90,31 @@ struct PathSegment {
 }
 
 trait RegionSplitter {
-    fn split(self) -> Vec<Region>;
+    fn split(self, segment: &PathSegment) -> Vec<Region>;
 }
 
 impl RegionSplitter for Region {
-    fn split(self) -> Vec<Region> {
-        todo! {}
+    fn split(self, segment: &PathSegment) -> Vec<Region> {
+        match segment.instruction {
+            Instruction::R(_) | Instruction::L(_) => self.transposed().split(&segment).transposed(),
+            Instruction::U(_) => todo! {},
+            Instruction::D(_) => todo! {},
+        }
     }
 }
 
 impl RegionSplitter for Vec<Region> {
-    fn split(self) -> Vec<Region> {
+    fn split(self, segment: &PathSegment) -> Vec<Region> {
         self.into_iter()
-            .map(RegionSplitter::split)
+            .map(|region| region.split(segment))
             .flatten()
             .collect()
+    }
+}
+
+impl Transpose for Vec<Region> {
+    fn transposed(self) -> Self {
+        self.into_iter().map(Transpose::transposed).collect()
     }
 }
 
