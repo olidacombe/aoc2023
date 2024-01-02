@@ -54,10 +54,24 @@ enum Region {
     R(Limits),
 }
 
+trait Mirror {
+    fn mirrored(self) -> Self;
+}
+
 impl Area for Region {
     fn area(&self) -> Option<usize> {
         match self {
             Region::U(limits) | Region::L(limits) | Region::R(limits) => limits.area(),
+        }
+    }
+}
+
+impl Mirror for Region {
+    fn mirrored(self) -> Self {
+        match self {
+            Region::U(limits) => Region::U(limits),
+            Region::L(limits) => Region::R(limits),
+            Region::R(limits) => Region::L(limits),
         }
     }
 }
@@ -72,6 +86,7 @@ impl Transpose for Region {
     }
 }
 
+#[derive(Clone, Copy)]
 enum Instruction {
     R(usize),
     U(usize),
@@ -79,14 +94,56 @@ enum Instruction {
     D(usize),
 }
 
+impl Transpose for Instruction {
+    fn transposed(self) -> Self {
+        match self {
+            Instruction::R(len) => Instruction::D(len),
+            Instruction::U(len) => Instruction::L(len),
+            Instruction::L(len) => Instruction::U(len),
+            Instruction::D(len) => Instruction::R(len),
+        }
+    }
+}
+
+impl Mirror for Instruction {
+    fn mirrored(self) -> Self {
+        match self {
+            Instruction::R(len) => Instruction::L(len),
+            Instruction::U(len) => Instruction::D(len),
+            Instruction::L(len) => Instruction::R(len),
+            Instruction::D(len) => Instruction::U(len),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 struct Point {
     x: i64,
     y: i64,
 }
 
+impl Transpose for Point {
+    fn transposed(self) -> Self {
+        Self {
+            x: self.y,
+            y: self.x,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 struct PathSegment {
     from: Point,
     instruction: Instruction,
+}
+
+impl Transpose for PathSegment {
+    fn transposed(self) -> Self {
+        Self {
+            from: self.from.transposed(),
+            instruction: self.instruction.transposed(),
+        }
+    }
 }
 
 trait RegionSplitter {
@@ -96,8 +153,10 @@ trait RegionSplitter {
 impl RegionSplitter for Region {
     fn split(self, segment: &PathSegment) -> Vec<Region> {
         match segment.instruction {
-            Instruction::R(_) | Instruction::L(_) => self.transposed().split(&segment).transposed(),
-            Instruction::U(_) => todo! {},
+            Instruction::R(_) | Instruction::L(_) => {
+                self.transposed().split(&segment.transposed()).transposed()
+            }
+            Instruction::U(_) => self.split(segment).mirrored(),
             Instruction::D(_) => todo! {},
         }
     }
@@ -109,6 +168,12 @@ impl RegionSplitter for Vec<Region> {
             .map(|region| region.split(segment))
             .flatten()
             .collect()
+    }
+}
+
+impl Mirror for Vec<Region> {
+    fn mirrored(self) -> Self {
+        self.into_iter().map(Mirror::mirrored).collect()
     }
 }
 
