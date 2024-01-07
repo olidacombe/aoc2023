@@ -32,11 +32,14 @@ trait Split {
     fn split_v(&self, at: Self::T) -> (Self, Self)
     where
         Self: Sized;
+
+    fn split_h(&self, at: Self::T) -> (Self, Self)
+    where
+        Self: Sized;
 }
 
-impl Split for Range<i64> {
-    type T = i64;
-    fn split_v(&self, at: Self::T) -> (Self, Self) {
+impl Range<i64> {
+    fn split(&self, at: i64) -> (Self, Self) {
         match self {
             Self::Full(_) => (
                 Self::RangeToInclusive(RangeToInclusive { end: at }),
@@ -76,9 +79,7 @@ impl Split for Range<i64> {
             ),
         }
     }
-}
 
-impl Range<i64> {
     fn size(&self) -> Option<usize> {
         match self {
             Range::RangeInclusive(range) => Some((*range.end() - *range.start()).abs() as usize),
@@ -95,7 +96,7 @@ struct Limits<T = i64> {
 impl Split for Limits {
     type T = i64;
     fn split_v(&self, at: Self::T) -> (Self, Self) {
-        let (lower, upper) = self.v.split_v(at);
+        let (lower, upper) = self.v.split(at);
         (
             Self {
                 h: self.h.clone(),
@@ -104,6 +105,23 @@ impl Split for Limits {
             Self {
                 h: self.h.clone(),
                 v: upper,
+            },
+        )
+    }
+
+    fn split_h(&self, at: Self::T) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        let (lower, upper) = self.h.split(at);
+        (
+            Self {
+                h: lower,
+                v: self.v.clone(),
+            },
+            Self {
+                h: upper,
+                v: self.v.clone(),
             },
         )
     }
@@ -160,6 +178,26 @@ impl Split for Region {
             Self::R(limits) => {
                 let (lower, upper) = limits.split_v(at);
                 (Self::R(lower), Self::R(upper))
+            }
+        }
+    }
+    /// unconditionally split L|R
+    fn split_h(&self, at: Self::T) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::U(limits) => {
+                let (lower, upper) = limits.split_h(at);
+                (Self::L(lower), Self::R(upper))
+            }
+            Self::L(limits) => {
+                let (lower, upper) = limits.split_h(at);
+                (Self::L(lower), Self::R(upper))
+            }
+            Self::R(limits) => {
+                let (lower, upper) = limits.split_h(at);
+                (Self::L(lower), Self::R(upper))
             }
         }
     }
@@ -285,18 +323,18 @@ impl RegionSplitter for Region {
                 if self.limits().v.contains(&start) && self.limits().v.contains(&end) {
                     let (lower, upper) = self.split_v(start);
                     let (mid, upper) = upper.split_v(end);
-                    // TODO split_h on mid
-                    return vec![lower, mid, upper];
+                    let (l, r) = mid.split_h(segment.from.x);
+                    return vec![lower, l, r, upper];
                 }
                 if self.limits().v.contains(&start) {
                     let (lower, upper) = self.split_v(start);
-                    // TODO split_h on upper
-                    return vec![lower, upper];
+                    let (l, r) = upper.split_h(segment.from.x);
+                    return vec![lower, l, r];
                 }
                 if self.limits().v.contains(&end) {
                     let (lower, upper) = self.split_v(end);
-                    // TODO split_h on lower
-                    return vec![lower, upper];
+                    let (l, r) = lower.split_h(segment.from.x);
+                    return vec![l, r, upper];
                 }
                 vec![self]
             }
