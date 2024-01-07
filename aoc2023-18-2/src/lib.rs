@@ -1,10 +1,81 @@
-use std::ops::{RangeFrom, RangeFull, RangeToInclusive, Sub};
+use std::ops::{Bound, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeToInclusive};
 
+#[derive(Clone)]
 enum Range<T> {
     Full(RangeFull),
     RangeToInclusive(RangeToInclusive<T>),
     RangeFrom(RangeFrom<T>),
-    RangeInclusive(std::ops::RangeInclusive<T>),
+    RangeInclusive(RangeInclusive<T>),
+}
+
+impl<T> RangeBounds<T> for Range<T> {
+    fn start_bound(&self) -> Bound<&T> {
+        match self {
+            Self::Full(range) => range.start_bound(),
+            Self::RangeToInclusive(range) => range.start_bound(),
+            Self::RangeFrom(range) => range.start_bound(),
+            Self::RangeInclusive(range) => range.start_bound(),
+        }
+    }
+    fn end_bound(&self) -> Bound<&T> {
+        match self {
+            Self::Full(range) => range.end_bound(),
+            Self::RangeToInclusive(range) => range.end_bound(),
+            Self::RangeFrom(range) => range.end_bound(),
+            Self::RangeInclusive(range) => range.end_bound(),
+        }
+    }
+}
+
+trait Split {
+    type T;
+    fn split_v(&self, at: Self::T) -> (Self, Self)
+    where
+        Self: Sized;
+}
+
+impl Split for Range<i64> {
+    type T = i64;
+    fn split_v(&self, at: Self::T) -> (Self, Self) {
+        match self {
+            Self::Full(_) => (
+                Self::RangeToInclusive(RangeToInclusive { end: at }),
+                Self::RangeFrom(RangeFrom { start: at }),
+            ),
+            Self::RangeToInclusive(range) => (
+                Self::RangeToInclusive(RangeToInclusive { end: at }),
+                Self::RangeInclusive(
+                    at..=match range.end_bound() {
+                        Bound::Included(end) => *end,
+                        _ => unreachable!(),
+                    },
+                ),
+            ),
+            Self::RangeFrom(range) => (
+                Self::RangeInclusive(
+                    match range.start_bound() {
+                        Bound::Included(start) => *start,
+                        _ => unreachable!(),
+                    }..=at,
+                ),
+                Self::RangeFrom(at..),
+            ),
+            Self::RangeInclusive(range) => (
+                Self::RangeInclusive(
+                    match range.start_bound() {
+                        Bound::Included(start) => *start,
+                        _ => unreachable!(),
+                    }..=at,
+                ),
+                Self::RangeInclusive(
+                    at..=match range.end_bound() {
+                        Bound::Included(end) => *end,
+                        _ => unreachable!(),
+                    },
+                ),
+            ),
+        }
+    }
 }
 
 impl Range<i64> {
@@ -19,6 +90,23 @@ impl Range<i64> {
 struct Limits<T = i64> {
     h: Range<T>,
     v: Range<T>,
+}
+
+impl Split for Limits {
+    type T = i64;
+    fn split_v(&self, at: Self::T) -> (Self, Self) {
+        let (lower, upper) = self.v.split_v(at);
+        (
+            Self {
+                h: self.h.clone(),
+                v: lower,
+            },
+            Self {
+                h: self.h.clone(),
+                v: upper,
+            },
+        )
+    }
 }
 
 trait Transpose {
@@ -52,6 +140,37 @@ enum Region {
     L(Limits),
     // Right of path
     R(Limits),
+}
+
+impl Split for Region {
+    type T = i64;
+    fn split_v(&self, at: Self::T) -> (Self, Self)
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::U(limits) => {
+                let (lower, upper) = limits.split_v(at);
+                (Self::U(lower), Self::U(upper))
+            }
+            Self::L(limits) => {
+                let (lower, upper) = limits.split_v(at);
+                (Self::L(lower), Self::L(upper))
+            }
+            Self::R(limits) => {
+                let (lower, upper) = limits.split_v(at);
+                (Self::R(lower), Self::R(upper))
+            }
+        }
+    }
+}
+
+impl Region {
+    pub fn limits(&self) -> &Limits {
+        match self {
+            Self::U(limits) | Self::L(limits) | Self::R(limits) => limits,
+        }
+    }
 }
 
 trait Mirror {
@@ -157,7 +276,30 @@ impl RegionSplitter for Region {
                 self.transposed().split(&segment.transposed()).transposed()
             }
             Instruction::U(_) => self.split(segment).mirrored(),
-            Instruction::D(_) => todo! {},
+            Instruction::D(count) => {
+                if !self.limits().h.contains(&segment.from.x) {
+                    return vec![self];
+                }
+                let start = segment.from.y;
+                let end = segment.from.y + count as i64;
+                if self.limits().v.contains(&start) && self.limits().v.contains(&end) {
+                    let (lower, upper) = self.split_v(start);
+                    let (mid, upper) = upper.split_v(end);
+                    // TODO split_h on mid
+                    return vec![lower, mid, upper];
+                }
+                if self.limits().v.contains(&start) {
+                    let (lower, upper) = self.split_v(start);
+                    // TODO split_h on upper
+                    return vec![lower, upper];
+                }
+                if self.limits().v.contains(&end) {
+                    let (lower, upper) = self.split_v(end);
+                    // TODO split_h on lower
+                    return vec![lower, upper];
+                }
+                vec![self]
+            }
         }
     }
 }
