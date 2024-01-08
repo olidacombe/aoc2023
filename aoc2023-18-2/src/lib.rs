@@ -1,11 +1,26 @@
-use std::ops::{Bound, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeToInclusive};
+use std::ops::{
+    AddAssign, Bound, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeToInclusive,
+};
 
-#[derive(Clone)]
+use nom::{
+    bytes::complete::tag,
+    character::complete::{alpha1, digit1, hex_digit1, multispace1},
+    sequence::{delimited, separated_pair},
+    IResult,
+};
+
+#[derive(Clone, Debug)]
 enum Range<T> {
     Full(RangeFull),
     RangeToInclusive(RangeToInclusive<T>),
     RangeFrom(RangeFrom<T>),
     RangeInclusive(RangeInclusive<T>),
+}
+
+impl<T> Default for Range<T> {
+    fn default() -> Self {
+        Self::Full(RangeFull::default())
+    }
 }
 
 impl<T> RangeBounds<T> for Range<T> {
@@ -88,6 +103,7 @@ impl Range<i64> {
     }
 }
 
+#[derive(Debug, Default)]
 struct Limits<T = i64> {
     h: Range<T>,
     v: Range<T>,
@@ -132,7 +148,15 @@ trait Transpose {
 }
 
 trait Area {
-    fn area(&self) -> Option<usize>;
+    fn area_left(&self) -> Option<usize> {
+        None
+    }
+    fn area_right(&self) -> Option<usize> {
+        None
+    }
+    fn area(&self) -> Option<usize> {
+        self.area_left().or_else(|| self.area_right())
+    }
 }
 
 impl Area for Limits<i64> {
@@ -151,6 +175,7 @@ impl<T> Transpose for Limits<T> {
     }
 }
 
+#[derive(Debug)]
 enum Region {
     // Unknown
     U(Limits),
@@ -158,6 +183,12 @@ enum Region {
     L(Limits),
     // Right of path
     R(Limits),
+}
+
+impl Default for Region {
+    fn default() -> Self {
+        Self::U(Limits::default())
+    }
 }
 
 impl Split for Region {
@@ -251,6 +282,31 @@ enum Instruction {
     D(usize),
 }
 
+fn parse_instruction(input: &str) -> IResult<&str, ((&str, &str), &str)> {
+    separated_pair(
+        separated_pair(alpha1, multispace1, digit1),
+        multispace1,
+        delimited(tag("(#"), hex_digit1, tag(")")),
+    )(input)
+}
+
+impl From<&str> for Instruction {
+    fn from(input: &str) -> Self {
+        let ((_, _), hex) = parse_instruction(input).unwrap().1;
+        let (length, direction) = hex.split_at(hex.len() - 1);
+        let length = usize::from_str_radix(length, 16).unwrap();
+        match direction {
+            "0" => Self::R(length),
+            "1" => Self::D(length),
+            "2" => Self::L(length),
+            "3" => Self::U(length),
+            _ => {
+                unimplemented!();
+            }
+        }
+    }
+}
+
 impl Transpose for Instruction {
     fn transposed(self) -> Self {
         match self {
@@ -273,10 +329,21 @@ impl Mirror for Instruction {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Point {
     x: i64,
     y: i64,
+}
+
+impl AddAssign<&Instruction> for Point {
+    fn add_assign(&mut self, rhs: &Instruction) {
+        match rhs {
+            Instruction::R(x) => self.x += *x as i64,
+            Instruction::U(y) => self.y -= *y as i64,
+            Instruction::L(x) => self.x -= *x as i64,
+            Instruction::D(y) => self.y += *y as i64,
+        }
+    }
 }
 
 impl Transpose for Point {
@@ -292,6 +359,15 @@ impl Transpose for Point {
 struct PathSegment {
     from: Point,
     instruction: Instruction,
+}
+
+impl Mirror for PathSegment {
+    fn mirrored(self) -> Self {
+        Self {
+            from: self.from,
+            instruction: self.instruction.mirrored(),
+        }
+    }
 }
 
 impl Transpose for PathSegment {
@@ -313,7 +389,7 @@ impl RegionSplitter for Region {
             Instruction::R(_) | Instruction::L(_) => {
                 self.transposed().split(&segment.transposed()).transposed()
             }
-            Instruction::U(_) => self.split(segment).mirrored(),
+            Instruction::U(_) => self.mirrored().split(&segment.mirrored()).mirrored(),
             Instruction::D(count) => {
                 if !self.limits().h.contains(&segment.from.x) {
                     return vec![self];
@@ -342,6 +418,40 @@ impl RegionSplitter for Region {
     }
 }
 
+impl Area for Vec<Region> {
+    fn area_left(&self) -> Option<usize> {
+        let mut total = 0;
+        for region in self.iter().filter(|r| match r {
+            Region::L(_) => true,
+            _ => false,
+        }) {
+            match region.area() {
+                Some(a) => total += a,
+                None => {
+                    return None;
+                }
+            }
+        }
+        Some(total)
+    }
+
+    fn area_right(&self) -> Option<usize> {
+        let mut total = 0;
+        for region in self.iter().filter(|r| match r {
+            Region::R(_) => true,
+            _ => false,
+        }) {
+            match region.area() {
+                Some(a) => total += a,
+                None => {
+                    return None;
+                }
+            }
+        }
+        Some(total)
+    }
+}
+
 impl RegionSplitter for Vec<Region> {
     fn split(self, segment: &PathSegment) -> Vec<Region> {
         self.into_iter()
@@ -364,13 +474,37 @@ impl Transpose for Vec<Region> {
 }
 
 pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
-    usize::default()
+    let instructions = it.map(|s| Instruction::from(s.as_str()));
+    let mut space = vec![Region::default()];
+    let mut point = Point::default();
+    for instruction in instructions {
+        dbg!(&space);
+        space = space.split(&PathSegment {
+            from: point,
+            instruction,
+        });
+        point += &instruction;
+    }
+    dbg!(&space);
+    dbg!(&point);
+    space.area().unwrap()
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use indoc::indoc;
+
+    #[test]
+    fn mini_example_1() {
+        let example = indoc! {"
+            R 2 (#000020)
+            D 2 (#000021)
+            L 2 (#000022)
+            U 2 (#000023)
+        "};
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 4);
+    }
 
     #[test]
     fn full_example() {
