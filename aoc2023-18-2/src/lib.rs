@@ -335,6 +335,15 @@ struct Point {
     y: i64,
 }
 
+impl Mirror for Point {
+    fn mirrored(self) -> Self {
+        Self {
+            x: self.x,
+            y: -self.y,
+        }
+    }
+}
+
 impl AddAssign<&Instruction> for Point {
     fn add_assign(&mut self, rhs: &Instruction) {
         match rhs {
@@ -364,7 +373,7 @@ struct PathSegment {
 impl Mirror for PathSegment {
     fn mirrored(self) -> Self {
         Self {
-            from: self.from,
+            from: self.from.mirrored(),
             instruction: self.instruction.mirrored(),
         }
     }
@@ -389,7 +398,16 @@ impl RegionSplitter for Region {
             Instruction::R(_) | Instruction::L(_) => {
                 self.transposed().split(&segment.transposed()).transposed()
             }
-            Instruction::U(_) => self.mirrored().split(&segment.mirrored()).mirrored(),
+            Instruction::U(count) => self
+                .mirrored()
+                .split(&PathSegment {
+                    from: Point {
+                        x: segment.from.x,
+                        y: segment.from.y - count as i64,
+                    },
+                    instruction: Instruction::D(count),
+                })
+                .mirrored(),
             Instruction::D(count) => {
                 if !self.limits().h.contains(&segment.from.x) {
                     return vec![self];
@@ -599,17 +617,17 @@ mod test {
                     h: Range::Full(..),
                     v: Range::RangeToInclusive(..=-2),
                 }),
-                Region::L(Limits {
-                    h: Range::RangeToInclusive(..=0),
-                    v: Range::RangeInclusive(-2..=0),
-                }),
                 Region::R(Limits {
                     h: Range::RangeFrom(0..),
                     v: Range::RangeInclusive(-2..=0),
                 }),
+                Region::L(Limits {
+                    h: Range::RangeToInclusive(..=0),
+                    v: Range::RangeInclusive(-2..=0),
+                }),
                 Region::U(Limits {
                     h: Range::Full(..),
-                    v: Range::RangeFrom(-2..),
+                    v: Range::RangeFrom(0..),
                 })
             ]
         );
