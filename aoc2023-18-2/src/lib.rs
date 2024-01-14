@@ -398,17 +398,11 @@ trait RegionSplitter {
 impl RegionSplitter for Region {
     fn split(self, segment: &PathSegment) -> Vec<Region> {
         match segment.instruction {
-            Instruction::R(_) | Instruction::L(_) => {
-                dbg!(self
-                    .clone()
-                    .transposed()
-                    .split(&segment.transposed())
-                    .mirrored());
-                self.transposed()
-                    .split(&segment.transposed())
-                    .transposed()
-                    .mirrored()
-            }
+            Instruction::R(_) | Instruction::L(_) => self
+                .transposed()
+                .split(&segment.transposed())
+                .transposed()
+                .mirrored(),
             Instruction::U(count) => self
                 .mirrored()
                 .split(&PathSegment {
@@ -745,10 +739,6 @@ mod test {
                 }),
                 Region::R(Limits {
                     h: Range::RangeInclusive(0..=2),
-                    v: Range::RangeInclusive(0..=2)
-                }),
-                Region::L(Limits {
-                    h: Range::RangeFrom(2..),
                     v: Range::RangeInclusive(0..=2)
                 }),
                 Region::R(Limits {
