@@ -318,30 +318,10 @@ impl Transpose for Instruction {
     }
 }
 
-impl Mirror for Instruction {
-    fn mirrored(self) -> Self {
-        match self {
-            Instruction::R(len) => Instruction::L(len),
-            Instruction::U(len) => Instruction::D(len),
-            Instruction::L(len) => Instruction::R(len),
-            Instruction::D(len) => Instruction::U(len),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 struct Point {
     x: i64,
     y: i64,
-}
-
-impl Mirror for Point {
-    fn mirrored(self) -> Self {
-        Self {
-            x: self.x,
-            y: -self.y,
-        }
-    }
 }
 
 impl AddAssign<&Instruction> for Point {
@@ -368,15 +348,6 @@ impl Transpose for Point {
 struct PathSegment {
     from: Point,
     instruction: Instruction,
-}
-
-impl Mirror for PathSegment {
-    fn mirrored(self) -> Self {
-        Self {
-            from: self.from.mirrored(),
-            instruction: self.instruction.mirrored(),
-        }
-    }
 }
 
 impl Transpose for PathSegment {
