@@ -455,6 +455,7 @@ impl Area for Vec<Region> {
             match region.area() {
                 Some(a) => total += a,
                 None => {
+                    dbg!(region);
                     return None;
                 }
             }
@@ -471,6 +472,7 @@ impl Area for Vec<Region> {
             match region.area() {
                 Some(a) => total += a,
                 None => {
+                    dbg!(region);
                     return None;
                 }
             }
@@ -518,7 +520,7 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
         });
         point += &instruction;
     }
-    // dbg!(&space);
+    dbg!(&space);
     // dbg!(&point);
     space.area().unwrap()
 }
@@ -703,6 +705,57 @@ mod test {
     }
 
     #[test]
+    fn chop_1() {
+        let region = Region::R(Limits {
+            h: Range::RangeInclusive(0..=2),
+            v: Range::RangeFrom(0..),
+        });
+        let path_segment = PathSegment {
+            from: Point { x: 2, y: 2 },
+            instruction: Instruction::L(2),
+        };
+        assert_eq!(
+            region.split(&path_segment),
+            vec![
+                Region::L(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeFrom(2..)
+                }),
+                Region::R(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeInclusive(0..=2)
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn problem_3() {
+        let region = Region::L(Limits {
+            h: Range::RangeInclusive(0..=2),
+            v: Range::RangeToInclusive(..=0),
+        });
+        let path_segment = PathSegment {
+            from: Point { x: 2, y: 2 },
+            instruction: Instruction::L(2),
+        };
+        assert_eq!(region.clone().split(&path_segment), vec![region]);
+    }
+
+    #[test]
+    fn problem_4() {
+        let region = Region::L(Limits {
+            h: Range::RangeFrom(2..),
+            v: Range::RangeInclusive(0..=2),
+        });
+        let path_segment = PathSegment {
+            from: Point { x: 2, y: 2 },
+            instruction: Instruction::L(2),
+        };
+        assert_eq!(region.clone().split(&path_segment), vec![region]);
+    }
+
+    #[test]
     fn h_2() {
         let space = vec![
             Region::U(Limits {
@@ -750,6 +803,79 @@ mod test {
                     v: Range::RangeToInclusive(..=0)
                 }),
                 Region::L(Limits {
+                    h: Range::RangeFrom(2..),
+                    v: Range::RangeInclusive(0..=2)
+                }),
+                Region::U(Limits {
+                    h: Range::RangeFrom(2..),
+                    v: Range::RangeFrom(2..)
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn h3() {
+        let space = vec![
+            Region::U(Limits {
+                h: Range::RangeToInclusive(..=0),
+                v: Range::Full(..),
+            }),
+            Region::L(Limits {
+                h: Range::RangeInclusive(0..=2),
+                v: Range::RangeToInclusive(..=0),
+            }),
+            Region::R(Limits {
+                h: Range::RangeInclusive(0..=2),
+                v: Range::RangeInclusive(0..=2),
+            }),
+            Region::R(Limits {
+                h: Range::RangeInclusive(0..=2),
+                v: Range::RangeFrom(2..),
+            }),
+            Region::U(Limits {
+                h: Range::RangeFrom(2..),
+                v: Range::RangeToInclusive(..=0),
+            }),
+            Region::L(Limits {
+                h: Range::RangeFrom(2..),
+                v: Range::RangeInclusive(0..=2),
+            }),
+            Region::U(Limits {
+                h: Range::RangeFrom(2..),
+                v: Range::RangeFrom(2..),
+            }),
+        ];
+        let path_segment = PathSegment {
+            from: Point { x: 2, y: 2 },
+            instruction: Instruction::L(2),
+        };
+        assert_eq!(
+            space.split(&path_segment),
+            vec![
+                Region::U(Limits {
+                    h: Range::RangeToInclusive(..=0),
+                    v: Range::Full(..)
+                }),
+                Region::L(Limits {
+                    // currently getting R ...?
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeToInclusive(..=0)
+                }),
+                Region::R(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeInclusive(0..=2)
+                }),
+                Region::L(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeFrom(2..)
+                }),
+                Region::U(Limits {
+                    h: Range::RangeFrom(2..),
+                    v: Range::RangeToInclusive(..=0)
+                }),
+                Region::L(Limits {
+                    // currently gitting R...?
                     h: Range::RangeFrom(2..),
                     v: Range::RangeInclusive(0..=2)
                 }),
