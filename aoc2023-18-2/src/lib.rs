@@ -103,7 +103,7 @@ impl Range<i64> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Limits<T = i64> {
     h: Range<T>,
     v: Range<T>,
@@ -175,7 +175,7 @@ impl<T> Transpose for Limits<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Region {
     // Unknown
     U(Limits),
@@ -274,7 +274,7 @@ impl Transpose for Region {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Instruction {
     R(usize),
     U(usize),
@@ -344,7 +344,7 @@ impl Transpose for Point {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct PathSegment {
     from: Point,
     instruction: Instruction,
@@ -367,7 +367,15 @@ impl RegionSplitter for Region {
     fn split(self, segment: &PathSegment) -> Vec<Region> {
         match segment.instruction {
             Instruction::R(_) | Instruction::L(_) => {
-                self.transposed().split(&segment.transposed()).transposed()
+                dbg!(self
+                    .clone()
+                    .transposed()
+                    .split(&segment.transposed())
+                    .mirrored());
+                self.transposed()
+                    .split(&segment.transposed())
+                    .transposed()
+                    .mirrored()
             }
             Instruction::U(count) => self
                 .mirrored()
@@ -498,13 +506,13 @@ mod test {
                     h: Range::RangeToInclusive(..=0),
                     v: Range::Full(..)
                 }),
-                Region::L(Limits {
-                    h: Range::RangeInclusive(0..=2),
-                    v: Range::RangeToInclusive(..=0)
-                }),
                 Region::R(Limits {
                     h: Range::RangeInclusive(0..=2),
                     v: Range::RangeFrom(0..)
+                }),
+                Region::L(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeToInclusive(..=0)
                 }),
                 Region::U(Limits {
                     h: Range::RangeFrom(2..),
@@ -567,7 +575,7 @@ mod test {
                     v: Range::RangeToInclusive(..=0)
                 }),
                 Region::U(Limits {
-                    h: Range::RangeFrom(-2..),
+                    h: Range::RangeFrom(0..),
                     v: Range::Full(..)
                 })
             ]
