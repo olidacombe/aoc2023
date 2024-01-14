@@ -220,15 +220,15 @@ impl Split for Region {
         match self {
             Self::U(limits) => {
                 let (lower, upper) = limits.split_h(at);
-                (Self::L(lower), Self::R(upper))
+                (Self::L(upper), Self::R(lower))
             }
             Self::L(limits) => {
                 let (lower, upper) = limits.split_h(at);
-                (Self::L(lower), Self::R(upper))
+                (Self::L(upper), Self::R(lower))
             }
             Self::R(limits) => {
                 let (lower, upper) = limits.split_h(at);
-                (Self::L(lower), Self::R(upper))
+                (Self::L(upper), Self::R(lower))
             }
         }
     }
@@ -539,12 +539,12 @@ mod test {
                     h: Range::Full(..),
                     v: Range::RangeToInclusive(..=0),
                 }),
-                Region::R(Limits {
-                    h: Range::RangeToInclusive(..=0),
-                    v: Range::RangeInclusive(0..=2),
-                }),
                 Region::L(Limits {
                     h: Range::RangeFrom(0..),
+                    v: Range::RangeInclusive(0..=2),
+                }),
+                Region::R(Limits {
+                    h: Range::RangeToInclusive(..=0),
                     v: Range::RangeInclusive(0..=2),
                 }),
                 Region::U(Limits {
