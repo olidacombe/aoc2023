@@ -17,9 +17,25 @@ enum Range<T = i64> {
     RangeInclusive(RangeInclusive<T>),
 }
 
+trait Slither {
+    fn is_slither(&self) -> bool;
+}
+
 impl<T> Default for Range<T> {
     fn default() -> Self {
         Self::Full(RangeFull::default())
+    }
+}
+
+impl<T> Slither for Range<T>
+where
+    T: Eq,
+{
+    fn is_slither(&self) -> bool {
+        match self {
+            Self::RangeInclusive(r) => r.end() == r.start(),
+            _ => false,
+        }
     }
 }
 
@@ -107,6 +123,12 @@ impl Range<i64> {
 struct Limits<T = i64> {
     h: Range<T>,
     v: Range<T>,
+}
+
+impl Slither for Limits {
+    fn is_slither(&self) -> bool {
+        self.h.is_slither() || self.v.is_slither()
+    }
 }
 
 impl Split for Limits {
@@ -238,6 +260,16 @@ impl Region {
     pub fn limits(&self) -> &Limits {
         match self {
             Self::U(limits) | Self::L(limits) | Self::R(limits) => limits,
+        }
+    }
+}
+
+impl Slither for Region {
+    fn is_slither(&self) -> bool {
+        match self {
+            Self::U(limits) => limits.is_slither(),
+            Self::R(limits) => limits.is_slither(),
+            Self::L(limits) => limits.is_slither(),
         }
     }
 }
@@ -397,22 +429,26 @@ impl RegionSplitter for Region {
                     let (lower, upper) = self.split_v(start);
                     let (mid, upper) = upper.split_v(end);
                     let (l, r) = mid.split_h(segment.from.x);
-                    return vec![lower, l, r, upper];
+                    return vec![lower, l, r, upper].minus_slithers();
                 }
                 if self.limits().v.contains(&start) {
                     let (lower, upper) = self.split_v(start);
                     let (l, r) = upper.split_h(segment.from.x);
-                    return vec![lower, l, r];
+                    return vec![lower, l, r].minus_slithers();
                 }
                 if self.limits().v.contains(&end) {
                     let (lower, upper) = self.split_v(end);
                     let (l, r) = lower.split_h(segment.from.x);
-                    return vec![l, r, upper];
+                    return vec![l, r, upper].minus_slithers();
                 }
                 vec![self]
             }
         }
     }
+}
+
+trait SlitherFilter {
+    fn minus_slithers(self) -> Self;
 }
 
 impl Area for Vec<Region> {
@@ -446,6 +482,12 @@ impl Area for Vec<Region> {
             }
         }
         Some(total)
+    }
+}
+
+impl SlitherFilter for Vec<Region> {
+    fn minus_slithers(self) -> Self {
+        self.into_iter().filter(|r| !r.is_slither()).collect()
     }
 }
 
