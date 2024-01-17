@@ -384,9 +384,37 @@ struct PathSegment {
 
 impl Transpose for PathSegment {
     fn transposed(self) -> Self {
-        Self {
-            from: self.from.transposed(),
-            instruction: self.instruction.transposed(),
+        match self.instruction {
+            Instruction::R(len) => Self {
+                from: Point {
+                    x: self.from.y,
+                    y: self.from.x + len as i64,
+                },
+                instruction: Instruction::U(len),
+            },
+            Instruction::L(len) => Self {
+                from: Point {
+                    x: self.from.y,
+                    y: self.from.x - len as i64,
+                },
+                instruction: Instruction::D(len),
+            },
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Mirror for PathSegment {
+    fn mirrored(self) -> Self {
+        match self.instruction {
+            Instruction::U(len) => Self {
+                from: Point {
+                    x: self.from.x,
+                    y: self.from.y - len as i64,
+                },
+                instruction: Instruction::D(len),
+            },
+            _ => unimplemented!(),
         }
     }
 }
@@ -398,21 +426,10 @@ trait RegionSplitter {
 impl RegionSplitter for Region {
     fn split(self, segment: &PathSegment) -> Vec<Region> {
         match segment.instruction {
-            Instruction::R(_) | Instruction::L(_) => self
-                .transposed()
-                .split(&segment.transposed())
-                .transposed()
-                .mirrored(),
-            Instruction::U(count) => self
-                .mirrored()
-                .split(&PathSegment {
-                    from: Point {
-                        x: segment.from.x,
-                        y: segment.from.y - count as i64,
-                    },
-                    instruction: Instruction::D(count),
-                })
-                .mirrored(),
+            Instruction::R(_) | Instruction::L(_) => {
+                self.transposed().split(&segment.transposed()).transposed()
+            }
+            Instruction::U(_) => self.mirrored().split(&segment.mirrored()).mirrored(),
             Instruction::D(count) => {
                 if !self.limits().h.contains(&segment.from.x) {
                     return vec![self];
