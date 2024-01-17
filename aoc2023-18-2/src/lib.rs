@@ -472,7 +472,6 @@ impl Area for Vec<Region> {
             match region.area() {
                 Some(a) => total += a,
                 None => {
-                    dbg!(region);
                     return None;
                 }
             }
@@ -489,7 +488,6 @@ impl Area for Vec<Region> {
             match region.area() {
                 Some(a) => total += a,
                 None => {
-                    dbg!(region);
                     return None;
                 }
             }
@@ -773,6 +771,31 @@ mod test {
     }
 
     #[test]
+    fn problem_5() {
+        let region = Region::R(Limits {
+            h: Range::RangeInclusive(0..=2),
+            v: Range::RangeFrom(2..),
+        });
+        let path_segment = PathSegment {
+            from: Point { x: 4, y: 4 },
+            instruction: Instruction::L(4),
+        };
+        assert_eq!(
+            region.clone().split(&path_segment),
+            vec![
+                Region::L(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeFrom(4..)
+                }),
+                Region::R(Limits {
+                    h: Range::RangeInclusive(0..=2),
+                    v: Range::RangeInclusive(2..=4)
+                }),
+            ]
+        );
+    }
+
+    #[test]
     fn h_2() {
         let space = vec![
             Region::U(Limits {
@@ -913,6 +936,19 @@ mod test {
             U 2 (#000023)
         "};
         assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 4);
+    }
+
+    #[test]
+    fn mini_example_2() {
+        let example = indoc! {"
+            R 2 (#000020)
+            D 2 (#000021)
+            R 2 (#000020)
+            D 2 (#000021)
+            L 4 (#000042)
+            U 4 (#000043)
+        "};
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 12);
     }
 
     #[test]
