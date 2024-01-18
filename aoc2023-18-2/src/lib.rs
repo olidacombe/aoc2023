@@ -1,5 +1,5 @@
 use std::ops::{
-    AddAssign, Bound, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeToInclusive,
+    AddAssign, Bound, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeToInclusive, Sub,
 };
 
 use nom::{
@@ -314,6 +314,35 @@ enum Instruction {
     D(usize),
 }
 
+impl Sub for &Instruction {
+    type Output = i64;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            Instruction::R(_) => match rhs {
+                Instruction::U(_) => 1,
+                Instruction::D(_) => -1,
+                _ => unimplemented!(),
+            },
+            Instruction::U(_) => match rhs {
+                Instruction::L(_) => 1,
+                Instruction::R(_) => -1,
+                _ => unimplemented!(),
+            },
+            Instruction::L(_) => match rhs {
+                Instruction::D(_) => 1,
+                Instruction::U(_) => -1,
+                _ => unimplemented!(),
+            },
+            Instruction::D(_) => match rhs {
+                Instruction::R(_) => 1,
+                Instruction::L(_) => -1,
+                _ => unimplemented!(),
+            },
+        }
+    }
+}
+
 fn parse_instruction(input: &str) -> IResult<&str, ((&str, &str), &str)> {
     separated_pair(
         separated_pair(alpha1, multispace1, digit1),
@@ -469,11 +498,8 @@ impl Area for Vec<Region> {
             Region::L(_) => true,
             _ => false,
         }) {
-            match region.area() {
-                Some(a) => total += a,
-                None => {
-                    return None;
-                }
+            if let Some(a) = region.area() {
+                total += a;
             }
         }
         Some(total)
@@ -485,11 +511,8 @@ impl Area for Vec<Region> {
             Region::R(_) => true,
             _ => false,
         }) {
-            match region.area() {
-                Some(a) => total += a,
-                None => {
-                    return None;
-                }
+            if let Some(a) = region.area() {
+                total += a;
             }
         }
         Some(total)
@@ -524,10 +547,14 @@ impl Transpose for Vec<Region> {
 }
 
 pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
-    let instructions = it.map(|s| Instruction::from(s.as_str()));
+    let mut instructions = it.map(|s| Instruction::from(s.as_str())).peekable();
     let mut space = vec![Region::default()];
     let mut point = Point::default();
-    for instruction in instructions {
+    let mut turn_score = 0;
+    while let Some(instruction) = instructions.next() {
+        if let Some(next) = instructions.peek() {
+            turn_score += next - &instruction;
+        }
         // dbg!(&space);
         space = space.split(&PathSegment {
             from: point,
@@ -537,7 +564,11 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
     }
     dbg!(&space);
     // dbg!(&point);
-    space.area().unwrap()
+    if turn_score > 0 {
+        space.area_right().unwrap()
+    } else {
+        space.area_left().unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -1016,10 +1047,7 @@ mod test {
             L 2 (#000022)
             U 2 (#000023)
         "};
-        assert_eq!(
-            cubic_metres_of_lava(example.lines().map(String::from)),
-            952408144115
-        );
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 42);
     }
 
     #[test]
