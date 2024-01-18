@@ -940,6 +940,8 @@ mod test {
 
     #[test]
     fn mini_example_2() {
+        // #
+        // ##
         let example = indoc! {"
             R 2 (#000020)
             D 2 (#000021)
@@ -949,6 +951,75 @@ mod test {
             U 4 (#000043)
         "};
         assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 12);
+    }
+
+    #[test]
+    fn mini_example_3() {
+        // ##
+        // #
+        let example = indoc! {"
+            R 4 (#000040)
+            D 2 (#000021)
+            L 2 (#000022)
+            D 2 (#000021)
+            L 2 (#000022)
+            U 4 (#000043)
+        "};
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 12);
+    }
+
+    #[test]
+    fn mini_example_4() {
+        // ##
+        //  #
+        let example = indoc! {"
+            R 4 (#000040)
+            D 4 (#000041)
+            L 2 (#000022)
+            U 2 (#000023)
+            L 2 (#000022)
+            U 2 (#000023)
+        "};
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 12);
+    }
+
+    #[test]
+    fn mini_example_5() {
+        //  #
+        // ##
+        let example = indoc! {"
+            U 2 (#000023)
+            R 2 (#000020)
+            D 4 (#000041)
+            L 4 (#000042)
+            U 2 (#000023)
+            R 2 (#000020)
+        "};
+        assert_eq!(cubic_metres_of_lava(example.lines().map(String::from)), 12);
+    }
+
+    #[test]
+    fn full_example_minified() {
+        let example = indoc! {"
+            R 6 (#000060)
+            D 5 (#000051)
+            L 2 (#000020)
+            D 2 (#000021)
+            R 2 (#000020)
+            D 2 (#000021)
+            L 5 (#000052)
+            U 2 (#000023)
+            L 1 (#000012)
+            U 2 (#000021)
+            R 2 (#000022)
+            U 3 (#000033)
+            L 2 (#000022)
+            U 2 (#000023)
+        "};
+        assert_eq!(
+            cubic_metres_of_lava(example.lines().map(String::from)),
+            952408144115
+        );
     }
 
     #[test]
