@@ -1,4 +1,8 @@
-use std::ops::{Add, Mul};
+use std::{
+    cmp::Ordering,
+    ffi::IntoStringError,
+    ops::{Add, Mul},
+};
 
 use itertools::Itertools;
 use nom::{
@@ -8,12 +12,61 @@ use nom::{
     IResult,
 };
 
+#[derive(Clone, PartialEq)]
+enum Rotation {
+    Clockwise,
+    CounterClockwise,
+    Colinear,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Instruction {
     R(usize),
     U(usize),
     L(usize),
     D(usize),
+}
+
+impl Instruction {
+    fn length(&self) -> &usize {
+        match self {
+            Self::R(len) => len,
+            Self::U(len) => len,
+            Self::L(len) => len,
+            Self::D(len) => len,
+        }
+    }
+}
+
+impl Mul for &Instruction {
+    type Output = Rotation;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        use Instruction::{D, L, R, U};
+        use Rotation::{Clockwise, Colinear, CounterClockwise};
+        match self {
+            R(_) => match rhs {
+                D(_) => Clockwise,
+                U(_) => CounterClockwise,
+                _ => Colinear,
+            },
+            U(_) => match rhs {
+                R(_) => Clockwise,
+                L(_) => CounterClockwise,
+                _ => Colinear,
+            },
+            L(_) => match rhs {
+                U(_) => Clockwise,
+                D(_) => CounterClockwise,
+                _ => Colinear,
+            },
+            D(_) => match rhs {
+                L(_) => Clockwise,
+                R(_) => CounterClockwise,
+                _ => Colinear,
+            },
+        }
+    }
 }
 
 fn parse_instruction(input: &str) -> IResult<&str, ((&str, &str), &str)> {
@@ -64,51 +117,80 @@ impl Mul for &Point {
     type Output = i64;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        // if self.x == rhs.x {
-        //     return 0;
-        // }
-        (self.x - rhs.x + 1) * (self.y.abs() + 1)
-        // ((rhs.y + self.y) * (rhs.x - self.x)) / 2
+        // Note this is "double what we want"
+        (rhs.y + self.y) * (rhs.x - self.x)
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct RotationCounter {
+    l: usize,
+    r: usize,
+    consecutive_l: usize,
+    consecutive_r: usize,
+}
+
+impl RotationCounter {
+    fn rotation_bonus(&self) -> usize {
+        match self.l.cmp(&self.r) {
+            Ordering::Greater => self.consecutive_l,
+            Ordering::Less => self.consecutive_r,
+            _ => 0,
+        }
     }
 }
 
 pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
-    let instructions = it.map(|s| Instruction::from(s.as_str()));
+    let instructions: Vec<_> = it.map(|s| Instruction::from(s.as_str())).collect();
+    let rotations = instructions
+        .iter()
+        .circular_tuple_windows()
+        .map(|(i1, i2)| i1 * i2);
+    let rotation_scores = rotations.circular_tuple_windows().fold(
+        RotationCounter::default(),
+        |mut acc, (prev, next)| match prev {
+            Rotation::Colinear => acc,
+            Rotation::Clockwise => {
+                acc.r += 1;
+                if next == prev {
+                    acc.consecutive_r += 1;
+                }
+                acc
+            }
+            Rotation::CounterClockwise => {
+                acc.l += 1;
+                if next == prev {
+                    acc.consecutive_l += 1;
+                }
+                acc
+            }
+        },
+    );
+    let double_length_score = instructions
+        .iter()
+        .fold(0, |acc, instruction| acc + instruction.length());
     // convert instructions to a sequence of points
     let points: Vec<Point> = instructions
-        .scan(Point::default(), |point, ref instruction| {
+        .iter()
+        .scan(Point::default(), |point, instruction| {
             Some(*point + instruction)
         })
         .collect();
     // iterate over pairs of points
     let pairs = points.into_iter().circular_tuple_windows();
     // reduce using signed trapezoid
-    pairs
+    let double_internal_area = pairs
         .fold(0, |area, (ref p, ref q)| area + p * q)
-        .unsigned_abs() as usize
+        .unsigned_abs() as usize;
 
-    // let mut space = vec![Region::default()];
-    // let mut point = Point::default();
-    // let mut turn_score = 0;
-    // while let Some(instruction) = instructions.next() {
-    //     if let Some(next) = instructions.peek() {
-    //         turn_score += next - &instruction;
-    //     }
-    //     // dbg!(&space);
-    //     space = space.split(&PathSegment {
-    //         from: point,
-    //         instruction,
-    //     });
-    //     point += &instruction;
-    // }
-    // dbg!(&space);
-    // // dbg!(&point);
-    // if turn_score > 0 {
-    //     space.area_right().unwrap()
-    // } else {
-    //     space.area_left().unwrap()
-    // }
-    // 0
+    dbg!(rotation_scores);
+    dbg!(rotation_scores.rotation_bonus());
+
+    let mut total_score = 2 * double_internal_area;
+    total_score += 2 * double_length_score;
+    total_score += rotation_scores.rotation_bonus();
+
+    total_score / 4
 }
 
 #[cfg(test)]
