@@ -1,6 +1,5 @@
 use std::{
     cmp::Ordering,
-    ffi::IntoStringError,
     ops::{Add, Mul},
 };
 
@@ -133,8 +132,8 @@ struct RotationCounter {
 impl RotationCounter {
     fn rotation_bonus(&self) -> usize {
         match self.l.cmp(&self.r) {
-            Ordering::Greater => self.consecutive_l,
-            Ordering::Less => self.consecutive_r,
+            Ordering::Greater => self.consecutive_l - self.consecutive_r,
+            Ordering::Less => self.consecutive_r - self.consecutive_l,
             _ => 0,
         }
     }
@@ -166,7 +165,7 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
             }
         },
     );
-    let double_length_score = instructions
+    let length_score = instructions
         .iter()
         .fold(0, |acc, instruction| acc + instruction.length());
     // convert instructions to a sequence of points
@@ -183,12 +182,14 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
         .fold(0, |area, (ref p, ref q)| area + p * q)
         .unsigned_abs() as usize;
 
-    dbg!(rotation_scores);
+    dbg!(double_internal_area);
+    dbg!(length_score);
     dbg!(rotation_scores.rotation_bonus());
 
-    let mut total_score = 2 * double_internal_area;
-    total_score += 2 * double_length_score;
+    let mut total_score = double_internal_area;
+    total_score += 2 * length_score;
     total_score += rotation_scores.rotation_bonus();
+    dbg!(total_score);
 
     total_score / 4
 }
@@ -196,7 +197,24 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use indoc::indoc;
+    use indoc::{formatdoc, indoc};
+
+    #[test]
+    fn basic_rectangle() {
+        for i in 1..1000 {
+            let example = formatdoc! {"
+                    R 1 (#{i:x}0)
+                    D 1 (#{i:x}1)
+                    L 1 (#{i:x}2)
+                    U 1 (#{i:x}3)
+            "};
+            assert_eq!(
+                cubic_metres_of_lava(example.lines().map(String::from)),
+                (i + 1) * (i + 1),
+                "({i}+1) * ({i}+1)"
+            );
+        }
+    }
 
     #[test]
     fn full_example() {
