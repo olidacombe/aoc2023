@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    ops::{Add, Mul},
+    ops::{AddAssign, Mul},
 };
 
 use itertools::Itertools;
@@ -99,16 +99,14 @@ struct Point {
     y: i64,
 }
 
-impl Add<&Instruction> for Point {
-    type Output = Self;
-    fn add(mut self, rhs: &Instruction) -> Self::Output {
+impl AddAssign<&Instruction> for Point {
+    fn add_assign(&mut self, rhs: &Instruction) {
         match rhs {
             Instruction::R(x) => self.x += *x as i64,
-            Instruction::U(y) => self.y -= *y as i64,
+            Instruction::U(y) => self.y += *y as i64,
             Instruction::L(x) => self.x -= *x as i64,
-            Instruction::D(y) => self.y += *y as i64,
-        };
-        self
+            Instruction::D(y) => self.y -= *y as i64,
+        }
     }
 }
 
@@ -172,7 +170,8 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
     let points: Vec<Point> = instructions
         .iter()
         .scan(Point::default(), |point, instruction| {
-            Some(*point + instruction)
+            *point += instruction;
+            Some(point.to_owned())
         })
         .collect();
     // iterate over pairs of points
@@ -182,14 +181,14 @@ pub fn cubic_metres_of_lava(it: impl Iterator<Item = String>) -> usize {
         .fold(0, |area, (ref p, ref q)| area + p * q)
         .unsigned_abs() as usize;
 
-    dbg!(double_internal_area);
-    dbg!(length_score);
-    dbg!(rotation_scores.rotation_bonus());
+    // dbg!(double_internal_area);
+    // dbg!(length_score);
+    // dbg!(rotation_scores.rotation_bonus());
 
-    let mut total_score = double_internal_area;
+    let mut total_score = 2 * double_internal_area;
     total_score += 2 * length_score;
     total_score += rotation_scores.rotation_bonus();
-    dbg!(total_score);
+    // dbg!(total_score);
 
     total_score / 4
 }
@@ -212,6 +211,25 @@ mod test {
                 cubic_metres_of_lava(example.lines().map(String::from)),
                 (i + 1) * (i + 1),
                 "({i}+1) * ({i}+1)"
+            );
+        }
+    }
+
+    #[test]
+    fn basic_l() {
+        for i in 1..1000 {
+            let example = formatdoc! {"
+                    R 1 (#{i:x}0)
+                    D 1 (#{i:x}1)
+                    R 1 (#{i:x}0)
+                    D 1 (#{i:x}1)
+                    L 1 (#{:x}2)
+                    U 1 (#{:x}3)
+            ", 2*i, 2*i};
+            assert_eq!(
+                cubic_metres_of_lava(example.lines().map(String::from)),
+                3 * i * i + 4 * i + 1,
+                "(2({i})+1)^2 - {i}^2"
             );
         }
     }
