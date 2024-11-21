@@ -1,0 +1,13 @@
+[package]
+name = "aoc2023-19-1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+color-eyre.workspace = true
+nom = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }
