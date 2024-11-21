@@ -237,7 +237,7 @@ struct Input {
 impl Input {
     pub fn parse(input: &str) -> Self {
         let (_, (workflows, parts)) =
-            separated_pair(Workflows::parse, newline, Parts::parse)(input).unwrap();
+            separated_pair(Workflows::parse, tag("\n\n"), Parts::parse)(input).unwrap();
         Self { workflows, parts }
     }
 }
