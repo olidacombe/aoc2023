@@ -115,6 +115,15 @@ enum Comparator {
     Lt(u64),
 }
 
+impl Comparator {
+    fn evaluate(&self, lhs: u64) -> bool {
+        match self {
+            Comparator::Gt(rhs) => lhs > *rhs,
+            Comparator::Lt(rhs) => lhs < *rhs,
+        }
+    }
+}
+
 impl Parse for Comparator {
     fn parse(input: &str) -> IResult<&str, Self> {
         use nom::character::complete::u64;
@@ -136,8 +145,13 @@ struct Condition {
 
 impl Condition {
     fn evaluate(&self, part: &Part) -> bool {
-        // TODO
-        false
+        let candidate = match self.category {
+            Category::X => part.x,
+            Category::M => part.m,
+            Category::A => part.a,
+            Category::S => part.s,
+        };
+        self.comparator.evaluate(candidate)
     }
 }
 
@@ -268,7 +282,14 @@ struct Workflows(HashMap<String, Workflow>);
 impl Workflows {
     // true = Accepted
     fn run(&self, part: &Part, target: Target) -> bool {
-        false
+        match target {
+            Target::Reject => false,
+            Target::Accept => true,
+            Target::Workflow(id) => {
+                let workflow = self.0.get(id.as_str()).unwrap();
+                self.run(part, workflow.run(part))
+            }
+        }
     }
 }
 
