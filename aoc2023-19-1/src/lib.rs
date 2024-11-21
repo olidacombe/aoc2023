@@ -10,9 +10,12 @@ use nom::{
 };
 
 pub fn accepted_part_rating_sum<S: AsRef<str>>(input: S) -> u64 {
-    let input = Input::parse(input.as_ref());
-    dbg!(input);
-    u64::default()
+    let Input { workflows, parts } = Input::parse(input.as_ref());
+    parts
+        .into_iter()
+        .filter(|part| workflows.run(part, Target::default()))
+        .map(Part::score)
+        .sum()
 }
 
 #[derive(Debug)]
@@ -23,7 +26,7 @@ enum Category {
     S,
 }
 
-impl Category {
+impl Parse for Category {
     fn parse(input: &str) -> IResult<&str, Self> {
         let (rest, id) = alt((char('x'), char('m'), char('a'), char('s')))(input)?;
         Ok((
@@ -48,6 +51,12 @@ struct Part {
 }
 
 impl Part {
+    fn score(&self) -> u64 {
+        self.x + self.m + self.a + self.s
+    }
+}
+
+impl Parse for Part {
     fn parse(value: &str) -> IResult<&str, Self> {
         fn inards(input: &str) -> IResult<&str, Part> {
             use nom::character::complete::u64;
@@ -78,10 +87,18 @@ impl Part {
 #[derive(Debug)]
 struct Parts(Vec<Part>);
 
-impl Parts {
-    pub fn parse(input: &str) -> IResult<&str, Self> {
+impl Parse for Parts {
+    fn parse(input: &str) -> IResult<&str, Self> {
         let (rest, parts) = separated_list0(newline, Part::parse)(input)?;
         Ok((rest, Self(parts)))
+    }
+}
+
+impl<'a> IntoIterator for &'a Parts {
+    type Item = &'a Part;
+    type IntoIter = std::slice::Iter<'a, Part>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
@@ -117,6 +134,13 @@ struct Condition {
     comparator: Comparator,
 }
 
+impl Condition {
+    fn evaluate(&self, part: &Part) -> bool {
+        // TODO
+        false
+    }
+}
+
 impl Parse for Condition {
     fn parse(input: &str) -> IResult<&str, Self> {
         let (rest, (category, comparator)) = pair(Category::parse, Comparator::parse)(input)?;
@@ -130,11 +154,17 @@ impl Parse for Condition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Target {
     Accept,
     Reject,
     Workflow(String),
+}
+
+impl Default for Target {
+    fn default() -> Self {
+        Self::Workflow("in".to_string())
+    }
 }
 
 impl Parse for Target {
@@ -155,6 +185,18 @@ impl Parse for Target {
 struct Rule {
     condition: Option<Condition>,
     target: Target,
+}
+
+impl Rule {
+    fn evaluate(&self, part: &Part) -> Option<Target> {
+        if let Some(ref condition) = self.condition {
+            if condition.evaluate(part) {
+                return Some(self.target.clone());
+            }
+            return None;
+        }
+        Some(self.target.clone())
+    }
 }
 
 impl Parse for Rule {
@@ -184,7 +226,15 @@ impl Parse for Rule {
 #[derive(Debug)]
 struct Rules(Vec<Rule>);
 
-impl Rules {
+impl<'a> IntoIterator for &'a Rules {
+    type Item = &'a Rule;
+    type IntoIter = std::slice::Iter<'a, Rule>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Parse for Rules {
     fn parse(input: &str) -> IResult<&str, Self> {
         let (rest, rules) = separated_list0(char(','), Rule::parse)(input)?;
         Ok((rest, Self(rules)))
@@ -192,23 +242,40 @@ impl Rules {
 }
 
 #[derive(Debug)]
-struct Workflow {
-    rules: Rules,
+struct Workflow(Rules);
+
+impl Parse for Workflow {
+    fn parse(input: &str) -> IResult<&str, Self> {
+        let (rest, rules) = delimited(char('{'), Rules::parse, char('}'))(input)?;
+        Ok((rest, Self(rules)))
+    }
 }
 
 impl Workflow {
-    fn parse(input: &str) -> IResult<&str, Self> {
-        let (rest, rules) = delimited(char('{'), Rules::parse, char('}'))(input)?;
-        Ok((rest, Self { rules }))
+    fn run(&self, part: &Part) -> Target {
+        for rule in &self.0 {
+            if let Some(target) = rule.evaluate(part) {
+                return target;
+            }
+        }
+        Target::Reject
     }
 }
 
 #[derive(Debug)]
 struct Workflows(HashMap<String, Workflow>);
 
+impl Workflows {
+    // true = Accepted
+    fn run(&self, part: &Part, target: Target) -> bool {
+        false
+    }
+}
+
 #[derive(Debug)]
 struct NamedWorkflow<'a>(&'a str, Workflow);
 
+// TODO this with Parse trait?
 impl<'a> NamedWorkflow<'a> {
     fn parse(input: &'a str) -> IResult<&'a str, Self> {
         let (rest, (name, workflow)) = tuple((alpha1, Workflow::parse))(input)?;
@@ -216,7 +283,7 @@ impl<'a> NamedWorkflow<'a> {
     }
 }
 
-impl Workflows {
+impl Parse for Workflows {
     fn parse(input: &str) -> IResult<&str, Self> {
         let (rest, named_workflows) = separated_list0(newline, NamedWorkflow::parse)(input)?;
         Ok((
