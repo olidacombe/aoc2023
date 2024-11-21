@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use nom::{
+    branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, char, newline},
     multi::separated_list0,
-    sequence::{delimited, separated_pair, tuple},
+    sequence::{delimited, pair, separated_pair, tuple},
     IResult,
 };
 
@@ -12,6 +13,30 @@ pub fn accepted_part_rating_sum<S: AsRef<str>>(input: S) -> u64 {
     let input = Input::parse(input.as_ref());
     dbg!(input);
     u64::default()
+}
+
+#[derive(Debug)]
+enum Category {
+    X,
+    M,
+    A,
+    S,
+}
+
+impl Category {
+    fn parse(input: &str) -> IResult<&str, Self> {
+        let (rest, id) = alt((char('x'), char('m'), char('a'), char('s')))(input)?;
+        Ok((
+            rest,
+            match id {
+                'x' => Category::X,
+                'm' => Category::M,
+                'a' => Category::A,
+                's' => Category::S,
+                _ => unreachable!(),
+            },
+        ))
+    }
 }
 
 #[derive(Debug)]
@@ -60,14 +85,99 @@ impl Parts {
     }
 }
 
-#[derive(Debug)]
-struct Rule(String);
+trait Parse
+where
+    Self: Sized,
+{
+    fn parse(input: &str) -> IResult<&str, Self>;
+}
 
-impl Rule {
+#[derive(Debug)]
+enum Comparator {
+    Gt(u64),
+    Lt(u64),
+}
+
+impl Parse for Comparator {
     fn parse(input: &str) -> IResult<&str, Self> {
-        // consume the whole string for now
-        let (nothing, everything) = input.split_at(0);
-        Ok((nothing, Self(everything.to_string())))
+        use nom::character::complete::u64;
+        let (rest, (operator, operand)) = pair(alt((char('>'), char('<'))), u64)(input)?;
+        let comparator = match operator {
+            '>' => Comparator::Gt(operand),
+            '<' => Comparator::Lt(operand),
+            _ => unreachable!(),
+        };
+        Ok((rest, comparator))
+    }
+}
+
+#[derive(Debug)]
+struct Condition {
+    category: Category,
+    comparator: Comparator,
+}
+
+impl Parse for Condition {
+    fn parse(input: &str) -> IResult<&str, Self> {
+        let (rest, (category, comparator)) = pair(Category::parse, Comparator::parse)(input)?;
+        Ok((
+            rest,
+            Self {
+                category,
+                comparator,
+            },
+        ))
+    }
+}
+
+#[derive(Debug)]
+enum Target {
+    Accept,
+    Reject,
+    Workflow(String),
+}
+
+impl Parse for Target {
+    fn parse(input: &str) -> IResult<&str, Self> {
+        let (rest, id) = alpha1(input)?;
+        Ok((
+            rest,
+            match id {
+                "A" => Target::Accept,
+                "R" => Target::Reject,
+                _ => Target::Workflow(id.to_string()),
+            },
+        ))
+    }
+}
+
+#[derive(Debug)]
+struct Rule {
+    condition: Option<Condition>,
+    target: Target,
+}
+
+impl Parse for Rule {
+    fn parse(input: &str) -> IResult<&str, Self> {
+        if let Ok((rest, (condition, target))) =
+            separated_pair(Condition::parse, char(':'), Target::parse)(input)
+        {
+            return Ok((
+                rest,
+                Self {
+                    condition: Some(condition),
+                    target,
+                },
+            ));
+        }
+        let (rest, target) = Target::parse(input)?;
+        Ok((
+            rest,
+            Self {
+                condition: None,
+                target,
+            },
+        ))
     }
 }
 
@@ -135,15 +245,19 @@ impl Input {
 #[cfg(test)]
 mod test {
     use super::*;
+    use color_eyre::Result;
     use indoc::indoc;
 
     #[test]
-    fn parse_one_workflow() {
-        let example = indoc! {"
-            px{a<2006:qkq,m>2090:A,rfg}
-        "};
-        let input = Input::parse(example);
-        dbg!(input);
+    fn parse_rules() -> Result<()> {
+        Rules::parse("a<2006:qkq,m>2090:A,rfg")?;
+        Ok(())
+    }
+
+    #[test]
+    fn parse_workflow() -> Result<()> {
+        Workflow::parse("{a<2006:qkq,m>2090:A,rfg}")?;
+        Ok(())
     }
 
     #[test]
