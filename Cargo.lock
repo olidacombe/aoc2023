@@ -370,6 +370,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc2023-19-2"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "indoc",
+ "nom",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "arr_macro"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
