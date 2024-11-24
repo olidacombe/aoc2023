@@ -1,4 +1,4 @@
-use std::collections::{btree_set::Intersection, HashMap};
+use std::collections::HashMap;
 
 use nom::{
     branch::alt,
@@ -10,7 +10,7 @@ use nom::{
 };
 
 pub fn acceptable_parts_sum<S: AsRef<str>>(input: S) -> u64 {
-    let Input { workflows, parts } = Input::parse(input.as_ref());
+    let Input { workflows, .. } = Input::parse(input.as_ref());
 
     workflows.sum_acceptable(PartSpace::default(), Target::default())
 }
@@ -86,18 +86,13 @@ impl Parse for Category {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct Part {
     x: u64,
     m: u64,
     a: u64,
     s: u64,
-}
-
-impl Part {
-    fn score(&self) -> u64 {
-        self.x + self.m + self.a + self.s
-    }
 }
 
 impl Parse for Part {
@@ -160,13 +155,6 @@ enum Comparator {
 }
 
 impl Comparator {
-    fn evaluate(&self, lhs: u64) -> bool {
-        match self {
-            Comparator::Gt(rhs) => lhs > *rhs,
-            Comparator::Lt(rhs) => lhs < *rhs,
-        }
-    }
-
     fn split(&self, range: Range) -> (Option<Range>, Option<Range>) {
         match self {
             Self::Gt(threshold) => {
@@ -229,16 +217,6 @@ struct Condition {
 }
 
 impl Condition {
-    fn evaluate(&self, part: &Part) -> bool {
-        let candidate = match self.category {
-            Category::X => part.x,
-            Category::M => part.m,
-            Category::A => part.a,
-            Category::S => part.s,
-        };
-        self.comparator.evaluate(candidate)
-    }
-
     fn split(&self, mut space: PartSpace) -> (Option<PartSpace>, Option<PartSpace>) {
         let mut ret = (None, None);
         let candidate = match self.category {
@@ -321,16 +299,6 @@ struct Rule {
 }
 
 impl Rule {
-    fn evaluate(&self, part: &Part) -> Option<Target> {
-        if let Some(ref condition) = self.condition {
-            if condition.evaluate(part) {
-                return Some(self.target.clone());
-            }
-            return None;
-        }
-        Some(self.target.clone())
-    }
-
     fn split(&self, space: PartSpace) -> (Option<SpaceTarget>, Option<PartSpace>) {
         if let Some(ref condition) = self.condition {
             let (intersection, complement) = condition.split(space);
@@ -406,15 +374,6 @@ impl Parse for Workflow {
 }
 
 impl Workflow {
-    fn run(&self, part: &Part) -> Target {
-        for rule in &self.0 {
-            if let Some(target) = rule.evaluate(part) {
-                return target;
-            }
-        }
-        Target::Reject
-    }
-
     fn sum_acceptable(&self, space: PartSpace) -> SpaceTargets {
         // what is this spaghetti???
         let mut ret = SpaceTargets(Vec::new());
@@ -437,18 +396,6 @@ impl Workflow {
 struct Workflows(HashMap<String, Workflow>);
 
 impl Workflows {
-    // true = Accepted
-    fn run(&self, part: &Part, target: Target) -> bool {
-        match target {
-            Target::Reject => false,
-            Target::Accept => true,
-            Target::Workflow(id) => {
-                let workflow = self.0.get(id.as_str()).unwrap();
-                self.run(part, workflow.run(part))
-            }
-        }
-    }
-
     fn sum_acceptable(&self, space: PartSpace, target: Target) -> u64 {
         match target {
             Target::Reject => 0,
@@ -490,22 +437,20 @@ impl Parse for Workflows {
 
 #[derive(Debug)]
 struct Input {
-    parts: Parts,
     workflows: Workflows,
 }
 
 impl Input {
     pub fn parse(input: &str) -> Self {
-        let (_, (workflows, parts)) =
+        let (_, (workflows, _)) =
             separated_pair(Workflows::parse, tag("\n\n"), Parts::parse)(input).unwrap();
-        Self { workflows, parts }
+        Self { workflows }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use color_eyre::Result;
     use indoc::indoc;
 
     #[test]
