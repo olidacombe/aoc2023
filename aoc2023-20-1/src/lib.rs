@@ -1,16 +1,33 @@
 use std::{
-    cell::{LazyCell, RefCell},
-    collections::VecDeque,
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
     rc::Rc,
-    sync::{Arc, Mutex, OnceLock},
 };
 
 use nom::{
-    bytes::complete::tag, character::complete::alpha1, multi::separated_list1, sequence::preceded,
+    bytes::complete::tag,
+    character::complete::alpha1,
+    multi::separated_list1,
+    sequence::{preceded, separated_pair},
     IResult,
 };
 
-pub fn low_pulses_times_high_pulses_1k(mut it: impl Iterator<Item = String>) -> usize {
+pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usize {
+    let mut nodes: HashMap<String, Node> = HashMap::new();
+    let mut edge_queue = Vec::new();
+    for line in it {
+        let NodeSpec {
+            name,
+            node,
+            output_names,
+        } = NodeSpec::parse(line.as_str());
+        nodes.insert(name.clone(), node);
+        for output in output_names {
+            edge_queue.push((name.clone(), output));
+        }
+    }
+    dbg!(nodes);
+    dbg!(edge_queue);
     usize::default()
 }
 
@@ -22,18 +39,10 @@ where
 }
 
 type Node = Rc<RefCell<dyn Module>>;
-// impl<M> From<M> for Node
-// where
-//     M: Module,
-// {
-//     fn from(value: M) -> Self {
-//         Arc::new(RefCell::new(value))
-//     }
-// }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Outputs(Vec<Node>);
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct NodeNames(Vec<String>);
 
 impl IntoIterator for NodeNames {
@@ -62,18 +71,33 @@ impl Parse for NodeNames {
 struct NodeSpec {
     name: String,
     node: Node,
-    output_names: Vec<String>,
+    output_names: NodeNames,
+}
+
+impl NodeSpec {
+    fn parse(input: &str) -> Self {
+        let (_, (Named(name, node), output_names)) =
+            separated_pair(Named::<Node>::parse, tag(" -> "), NodeNames::parse)(input).unwrap();
+        Self {
+            name,
+            node,
+            output_names,
+        }
+    }
 }
 
 impl Parse for Named<Node> {
     fn parse(input: &str) -> IResult<&str, Self> {
-        if let Ok((rest, Named(name, broadcaster))) = Named::<Broadcaster>::parse(input) {
-            return Ok((rest, Named(name, Rc::new(RefCell::new(broadcaster)))));
-        }
         if let Ok((rest, Named(name, flipflop))) = Named::<FlipFlop>::parse(input) {
             return Ok((rest, Named(name, Rc::new(RefCell::new(flipflop)))));
         }
-        todo!()
+        if let Ok((rest, Named(name, conjunction))) = Named::<Conjunction>::parse(input) {
+            return Ok((rest, Named(name, Rc::new(RefCell::new(conjunction)))));
+        }
+        if let Ok((rest, Named(name, broadcaster))) = Named::<Broadcaster>::parse(input) {
+            return Ok((rest, Named(name, Rc::new(RefCell::new(broadcaster)))));
+        }
+        todo!("handle parse fail here");
     }
 }
 
@@ -96,7 +120,7 @@ struct Pulse {
     destination: Node,
 }
 
-trait Module {
+trait Module: std::fmt::Debug {
     fn connect_input(&mut self, name: &str) {
         // only does something for Conjunction
     }
@@ -113,7 +137,7 @@ trait Module {
 
 struct Named<T>(String, T);
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Broadcaster {
     outputs: Outputs,
 }
@@ -140,7 +164,7 @@ impl Module for Broadcaster {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct FlipFlop {
     state: bool,
     outputs: Outputs,
@@ -169,7 +193,7 @@ impl Module for FlipFlop {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Conjunction {
     outputs: Outputs,
     inputs: NodeNames,
@@ -178,7 +202,7 @@ struct Conjunction {
 impl Parse for Named<Conjunction> {
     fn parse(input: &str) -> IResult<&str, Self> {
         use nom::character::complete::char;
-        let (rest, name) = preceded(char('&'), alpha1)(input)?;
+        let (rest, name) = preceded(char('%'), alpha1)(input)?;
         Ok((rest, Named(name.into(), Conjunction::default())))
     }
 }
