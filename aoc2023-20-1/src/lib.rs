@@ -1,4 +1,5 @@
 use std::{
+    borrow::BorrowMut,
     cell::RefCell,
     collections::{HashMap, VecDeque},
     rc::Rc,
@@ -26,8 +27,16 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
             edge_queue.push((name.clone(), output));
         }
     }
-    dbg!(nodes);
-    dbg!(edge_queue);
+    dbg!(&nodes);
+    dbg!(&edge_queue);
+
+    for (from, to) in edge_queue {
+        println!("{from} -> {to}");
+        let from = nodes.get(&from).unwrap();
+        let to = nodes.get(&to).unwrap();
+        // from.borrow_mut().connect_output(to);
+        // dbg!((*from).borrow_mut());
+    }
     usize::default()
 }
 
