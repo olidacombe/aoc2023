@@ -37,7 +37,7 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
     let mut counts = HashMap::<bool, usize>::from([(false, 0), (true, 0)]);
     let broadcaster = nodes.get("broadcaster").unwrap();
     let mut pulses = VecDeque::new();
-    for _ in 1..1000 {
+    for _ in 0..1000 {
         pulses.push_back(Pulse::button(broadcaster.clone()));
         while let Some(Pulse {
             value,
