@@ -45,6 +45,12 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
             destination,
         }) = pulses.pop_front()
         {
+            println!(
+                "{} -{}-> {}",
+                origin,
+                if value { "high" } else { "low" },
+                destination.borrow().name()
+            );
             *counts.get_mut(&value).unwrap() += 1;
             let mut destination = destination.borrow_mut();
             destination.process_input_pulse(&origin, value);
@@ -54,6 +60,7 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
         }
     }
 
+    dbg!(&counts);
     counts.values().product()
 }
 
@@ -266,6 +273,8 @@ impl Module for FlipFlop {
         if !pulse {
             self.state = !self.state;
             self.to_send = Some(self.state);
+        } else {
+            self.to_send = None;
         }
     }
     fn compute_pulse(&mut self) -> Option<bool> {
