@@ -1,5 +1,5 @@
 use std::{
-    cell::{RefCell, RefMut},
+    cell::RefCell,
     collections::{HashMap, VecDeque},
     rc::Rc,
 };
@@ -13,6 +13,7 @@ use nom::{
 };
 
 pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usize {
+    // First, set up our graph
     let mut nodes: HashMap<String, Node> = HashMap::new();
     let mut edge_queue: Vec<(Node, String)> = Vec::new();
     for line in it {
@@ -31,7 +32,29 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
         to.borrow_mut().connect_input(&from_name);
         from.borrow_mut().connect_output(to.clone());
     }
-    usize::default()
+
+    // Now process pulses
+    let mut counts = HashMap::<bool, usize>::from([(false, 0), (true, 0)]);
+    let broadcaster = nodes.get("broadcaster").unwrap();
+    let mut pulses = VecDeque::new();
+    for _ in 1..1000 {
+        pulses.push_back(Pulse::button(broadcaster.clone()));
+        while let Some(Pulse {
+            value,
+            origin,
+            destination,
+        }) = pulses.pop_front()
+        {
+            *counts.get_mut(&value).unwrap() += 1;
+            let mut destination = destination.borrow_mut();
+            destination.process_input_pulse(&origin, value);
+            for pulse in destination.get_output_pulses() {
+                pulses.push_back(pulse);
+            }
+        }
+    }
+
+    counts.values().product()
 }
 
 pub trait Parse
@@ -45,6 +68,29 @@ type Node = Rc<RefCell<dyn Module>>;
 
 #[derive(Debug, Default)]
 struct Outputs(Vec<Node>);
+
+impl Outputs {
+    fn push(&mut self, output: Node) {
+        self.0.push(output);
+    }
+}
+
+impl IntoIterator for Outputs {
+    type Item = Node;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Outputs {
+    type Item = &'a Node;
+    type IntoIter = std::slice::Iter<'a, Node>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
 #[derive(Debug, Default)]
 struct NodeNames(Vec<String>);
 
@@ -105,23 +151,20 @@ impl Parse for Node {
     }
 }
 
-impl Outputs {
-    fn push(&mut self, output: Node) {
-        self.0.push(output);
-    }
-}
-
-impl<'a> IntoIterator for &'a Outputs {
-    type Item = &'a Node;
-    type IntoIter = std::slice::Iter<'a, Node>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
 struct Pulse {
     value: bool,
+    origin: String,
     destination: Node,
+}
+
+impl Pulse {
+    fn button(broadcaster: Node) -> Self {
+        Self {
+            value: false,
+            origin: "button".into(),
+            destination: broadcaster,
+        }
+    }
 }
 
 trait Module: std::fmt::Debug {
@@ -134,11 +177,18 @@ trait Module: std::fmt::Debug {
     fn process_input_pulse(&mut self, from: &str, pulse: bool);
     fn compute_pulse(&mut self) -> Option<bool>;
     fn name(&self) -> &str;
-    fn send_output_pulses(&mut self) {
+    fn get_output_pulses(&mut self) -> Vec<Pulse> {
         let Some(pulse) = self.compute_pulse() else {
-            return;
+            return Vec::new();
         };
-        for output in self.outputs() {}
+        self.outputs()
+            .into_iter()
+            .map(|output| Pulse {
+                value: pulse,
+                origin: self.name().into(),
+                destination: output.clone(),
+            })
+            .collect()
     }
 }
 
