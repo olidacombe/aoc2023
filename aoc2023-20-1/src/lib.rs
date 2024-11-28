@@ -29,8 +29,8 @@ pub fn low_pulses_times_high_pulses_1k(it: impl Iterator<Item = String>) -> usiz
         let to = nodes
             .entry(to_name.clone())
             .or_insert_with(|| Rc::new(RefCell::new(Sink::new(to_name.to_string()))));
-        to.borrow_mut().connect_input(&from_name);
         from.borrow_mut().connect_output(to.clone());
+        to.borrow_mut().connect_input(&from_name);
     }
 
     // Now process pulses
@@ -254,7 +254,7 @@ impl FlipFlop {
 impl Parse for FlipFlop {
     fn parse(input: &str) -> IResult<&str, Self> {
         use nom::character::complete::char;
-        let (rest, name) = preceded(char('&'), alpha1)(input)?;
+        let (rest, name) = preceded(char('%'), alpha1)(input)?;
         Ok((rest, FlipFlop::new(name.into())))
     }
 }
@@ -302,7 +302,7 @@ impl Conjunction {
 impl Parse for Conjunction {
     fn parse(input: &str) -> IResult<&str, Self> {
         use nom::character::complete::char;
-        let (rest, name) = preceded(char('%'), alpha1)(input)?;
+        let (rest, name) = preceded(char('&'), alpha1)(input)?;
         Ok((rest, Conjunction::new(name.into())))
     }
 }
