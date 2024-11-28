@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, VecDeque},
-    rc::Rc,
-};
-
+use common::parse;
 use nom::{
     bytes::complete::tag,
     character::complete::alpha1,
@@ -11,13 +6,27 @@ use nom::{
     sequence::{preceded, separated_pair},
     IResult,
 };
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
+use thiserror::Error;
 
-pub fn min_button_presses_to_trigger_rx(it: impl Iterator<Item = String>) -> usize {
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    Parse(#[from] parse::Error),
+}
+
+pub fn min_button_presses_to_trigger_rx(it: impl Iterator<Item = String>) -> Result<usize> {
     // First, set up our graph
     let mut nodes: HashMap<String, Node> = HashMap::new();
     let mut edge_queue: Vec<(Node, String)> = Vec::new();
     for line in it {
-        let NodeSpec { node, output_names } = NodeSpec::parse(line.as_str());
+        let NodeSpec { node, output_names } = NodeSpec::parse(line.as_str())?;
         let name = node.borrow().name().to_string();
         nodes.insert(name, node.clone());
         for output in output_names {
@@ -37,6 +46,7 @@ pub fn min_button_presses_to_trigger_rx(it: impl Iterator<Item = String>) -> usi
     let mut counts = HashMap::<bool, usize>::from([(false, 0), (true, 0)]);
     let broadcaster = nodes.get("broadcaster").unwrap();
     let rx = nodes.get("rx").unwrap();
+    dbg!(&rx);
     let mut pulses = VecDeque::new();
     let mut count = 0;
     loop {
@@ -56,7 +66,7 @@ pub fn min_button_presses_to_trigger_rx(it: impl Iterator<Item = String>) -> usi
             }
         }
         if rx.borrow().is_on() == Some(true) {
-            return count;
+            return Ok(count);
         }
     }
 }
@@ -127,10 +137,10 @@ struct NodeSpec {
 }
 
 impl NodeSpec {
-    fn parse(input: &str) -> Self {
+    fn parse(input: &str) -> parse::Result<Self> {
         let (_, (node, output_names)) =
-            separated_pair(Node::parse, tag(" -> "), NodeNames::parse)(input).unwrap();
-        Self { node, output_names }
+            separated_pair(Node::parse, tag(" -> "), NodeNames::parse)(input)?;
+        Ok(Self { node, output_names })
     }
 }
 
@@ -364,7 +374,7 @@ mod test {
     use indoc::indoc;
 
     #[test]
-    fn full_example_2() {
+    fn full_example_2() -> Result<()> {
         let example = indoc! {"
             broadcaster -> a
             %a -> inv, con
@@ -373,8 +383,9 @@ mod test {
             &con -> rx
         "};
         assert_eq!(
-            min_button_presses_to_trigger_rx(example.lines().map(String::from)),
+            min_button_presses_to_trigger_rx(example.lines().map(String::from))?,
             1
         );
+        Ok(())
     }
 }
